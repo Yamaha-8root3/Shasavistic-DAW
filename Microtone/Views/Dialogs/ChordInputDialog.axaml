@@ -1,0 +1,30 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="300" d:DesignHeight="120"
+        xmlns:microtone="using:Microtone"
+        xmlns:vm="using:Microtone.ViewModels"
+        x:Class="Microtone.Views.Dialogs.ChordInputDialog"
+        x:DataType="vm:Dialogs.ChordInputDialogViewModel"
+        SizeToContent="WidthAndHeight"
+        MinWidth="300"
+        WindowStartupLocation="CenterOwner"
+        Title="ChordInputDialog">
+    <StackPanel Margin="12" Spacing="8">
+        <TextBlock Text="ハーモニムを入力"/>
+        <TextBox x:Name="InputBox"
+                 Text="{Binding InputText}"
+                 Watermark="AhChyFuzi"
+                 TextChanged="InputBox_TextChanged"/>
+        <TextBlock x:Name="DetailLabel"
+                   IsVisible="False"></TextBlock>
+        <StackPanel Orientation="Horizontal" 
+                    HorizontalAlignment="Right"
+                    Spacing="8">
+            <Button x:Name="OkButton" Content="OK" Click="OnOk"
+                    IsEnabled="False"/>
+            <Button Content="キャンセル" Click="OnCancel"/>
+        </StackPanel>
+    </StackPanel>
+</Window>

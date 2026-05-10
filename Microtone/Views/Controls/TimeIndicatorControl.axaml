@@ -1,0 +1,55 @@
+﻿<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:compilerservices="using:System.Runtime.CompilerServices"
+             xmlns:controls="using:Microtone.ViewModels.Controls"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="200" d:DesignHeight="50"
+            x:Class="Microtone.Views.Controls.TimeIndicatorControl"             
+            x:DataType="controls:TimeIndicatorViewModel">
+
+    <Design.DataContext>
+		<controls:TimeIndicatorViewModel/>
+    </Design.DataContext>
+            
+  <StackPanel Orientation="Horizontal"
+              >
+
+    <!-- モード切り替えボタン -->
+    <DropDownButton Content="{Binding ModeLabel}">
+    <DropDownButton.Flyout>
+        <MenuFlyout>
+            <MenuItem Header="音楽" Command="{Binding SetMusicModeCommand}"/>
+            <MenuItem Header="時間" Command="{Binding SetTimeModeCommand}"/>
+        </MenuFlyout>
+    </DropDownButton.Flyout>
+    </DropDownButton>
+    
+    <Border Background="gray"
+        MinWidth="100"
+        IsHitTestVisible="True"
+        IsVisible="{Binding !IsEditing}"
+        PointerPressed="OnTextClicked">
+                <TextBlock Text="{Binding DisplayText}"
+                    VerticalAlignment="Center"
+                    TextAlignment="Center"
+                    FontSize="25"
+                    Margin="10,0,10,0"/>
+    </Border>
+
+    <TextBox x:Name="editbox"
+             Text="{Binding EditText}"
+             IsVisible="{Binding IsEditing}"
+             LostFocus="OnEditCommit"
+             KeyDown="OnEditKeyDown"
+             IsHitTestVisible="True"
+             MinWidth="100"
+             Background="Transparent"
+             VerticalAlignment="Center"
+             TextAlignment="Center"
+             Margin="10,0,10,0"
+             FontSize="25"
+                />
+
+</StackPanel>
+</UserControl>
