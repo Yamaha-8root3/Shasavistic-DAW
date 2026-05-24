@@ -18,10 +18,10 @@ namespace Microtone.Models.Score
         //    Center = 2,
         //}
         public SKColor Background = new(103, 102, 129);
-        public float Spacing_1D = 200f;
-        public float PixelPerQuarter = 100f;
+        //public float Spacing_1D = 200f;
+        //public float PixelPerQuarter = 100f;
 
-        public Dimensions<SKColor> DimensionColor = new([
+    public Dimensions<SKColor> DimensionColor = new([
             new SKColor(254,254,254), // 1D
             new SKColor(242,121,146), // 2D
             new SKColor(108,217,133), // 3D

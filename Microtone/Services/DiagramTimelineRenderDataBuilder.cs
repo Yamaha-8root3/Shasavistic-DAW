@@ -25,8 +25,12 @@ namespace Microtone.Services
 {
   internal class DiagramTimelineRenderDataBuilder
   {
-    public static SKRenderData Build(ScoreData score, ScoreRenderTheme theme, GridSettings? grid = null, Guid? selectedId = null, IReadOnlyDictionary<Guid, long>? displayTickOverrides = null)
+    public static SKRenderData Build(ScoreSession session, Guid? selectedId = null, IReadOnlyDictionary<Guid, long>? displayTickOverrides = null)
     {
+      var score = session.Score;
+      var theme = session.Theme;
+      var grid = session.Grid;
+
       var paint = new PaintFactory(theme);
       var data = new SKRenderData()
       {
@@ -60,8 +64,9 @@ namespace Microtone.Services
       var v = new ScoreVariables()
       {
         PPQ = score.TimeSignatureMap.PPQ,
+        Spacing_1D = session.Spacing_1D,
+        PixelPerQuarter = session.PixelPerQuarter,
         Initial = score.BenchMarkMap.Initial,
-        PixelPerQuarter = theme.PixelPerQuarter,
         Dimension1DOffset = score.Dimension1DOffset
       };
 
@@ -113,7 +118,7 @@ namespace Microtone.Services
             {
               ZIndex = 5,
               SourceItem = bm,
-              X = bm.StartTick / v.PPQ * theme.PixelPerQuarter,
+              X = bm.StartTick / v.PPQ * v.PixelPerQuarter,
               Stroke = paint.Splitter()
             });
             v.LastVariableChangedTick = bm.StartTick;
@@ -196,9 +201,9 @@ namespace Microtone.Services
           Stroke = paint.Scoreline(Math.Max(Math.Max(item.Offset.MaxDimension, item.Interval.MaxDimension), 1)),
           ZIndex = 2,
           SourceItem = item,
-          Y = -(float)Math.Log2((v.Resolutive.ResolveFrequency(v) * item.Offset.RatioValue / v.Initial)) * theme.Spacing_1D,
+          Y = -(float)Math.Log2((v.Resolutive.ResolveFrequency(v) * item.Offset.RatioValue / v.Initial)) * v.Spacing_1D,
           Repeat = item.Infinity,
-          RepeatInterval = item.Infinity == true ? -(float)Math.Log2(item.Interval.RatioValue) * theme.Spacing_1D : 1,
+          RepeatInterval = item.Infinity == true ? -(float)Math.Log2(item.Interval.RatioValue) * v.Spacing_1D : 1,
           LeftX = (float)v.LastVariableChangedTick / v.PPQ * v.PixelPerQuarter,
           RightX = MathF.Min(renderTickTo, GetEndTick(item)) / v.PPQ * v.PixelPerQuarter,
           IsOriented = item.IsOriented,
@@ -212,7 +217,7 @@ namespace Microtone.Services
           Stroke = paint.BenchMarkLine(BenchmarkKind.Resolutive),
           ZIndex = 5,
           SourceItem = null,
-          Y = -(float)Math.Log2((v.Resolutive.ResolveFrequency(v) / v.Initial)) * theme.Spacing_1D,
+          Y = -(float)Math.Log2((v.Resolutive.ResolveFrequency(v) / v.Initial)) * v.Spacing_1D,
           LeftX = (float)v.LastVariableChangedTick / v.PPQ * v.PixelPerQuarter,
           RightX = (float)renderTickTo / v.PPQ * v.PixelPerQuarter
         });
@@ -220,9 +225,11 @@ namespace Microtone.Services
       return commands;
     }
 
-    public static SKRenderCommand BuildCursor(ScoreData score, ScoreRenderTheme theme, long cursorTick)
+    public static SKRenderCommand BuildCursor(ScoreSession session, long cursorTick)
     {
-      float cursorX = (float)cursorTick / score.TimeSignatureMap.PPQ * theme.PixelPerQuarter;
+      var score = session.Score;
+      var theme = session.Theme;
+      float cursorX = (float)cursorTick / score.TimeSignatureMap.PPQ * session.PixelPerQuarter;
       return new SKVerticalLineCommand
       {
         Stroke = new SKPaint

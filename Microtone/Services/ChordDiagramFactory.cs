@@ -27,7 +27,7 @@ namespace Microtone.Services
 
             foreach (var pl in layout.Pitchlines)
             {
-                var plY = (float)(-Math.Log2(cd.RootFormula.ResolveFrequency(v) * pl.Source.Formula.RatioValue / v.Initial) * theme.Spacing_1D);
+                var plY = (float)(-Math.Log2(cd.RootFormula.ResolveFrequency(v) * pl.Source.Formula.RatioValue / v.Initial) * v.Spacing_1D);
                 var plX1 = baseX + (float)(pl.Span.Start.Scale * theme.Pitchline_Width + pl.Span.Start.Offset);
                 var plX2 = baseX + (float)(pl.Span.End.Scale * theme.Pitchline_Width + pl.Span.End.Offset);
 
@@ -67,8 +67,8 @@ namespace Microtone.Services
             }
             foreach (var dl in layout.Dimensionlines)
             {
-                var lowerY = (float)(-Math.Log2(cd.RootFormula.ResolveFrequency(v) * dl.Lower.Source.Formula.RatioValue / v.Initial) * theme.Spacing_1D);
-                var higherY = (float)(-Math.Log2(cd.RootFormula.ResolveFrequency(v) * dl.Higher.Source.Formula.RatioValue / v.Initial) * theme.Spacing_1D);
+                var lowerY = (float)(-Math.Log2(cd.RootFormula.ResolveFrequency(v) * dl.Lower.Source.Formula.RatioValue / v.Initial) * v.Spacing_1D);
+                var higherY = (float)(-Math.Log2(cd.RootFormula.ResolveFrequency(v) * dl.Higher.Source.Formula.RatioValue / v.Initial) * v.Spacing_1D);
 
                 // LowerAnchor / HigherAnchor の T値からX座標を解決
                 float LowerX(DimensionlineRenderAnchor anchor)
@@ -234,10 +234,10 @@ namespace Microtone.Services
                         //}
                         //else
                         //{
-                        rect.Bottom = (float)(-Math.Log2((cd.RootFormula.ResolveFrequency(v) * formula.RatioValue) / v.Initial) * theme.Spacing_1D) + theme.Pitchline_Height / 2;
+                        rect.Bottom = (float)(-Math.Log2((cd.RootFormula.ResolveFrequency(v) * formula.RatioValue) / v.Initial) * v.Spacing_1D) + theme.Pitchline_Height / 2;
                         formula[d] += 1;
                         formula[1] += v.Dimension1DOffset[d]!;
-                        rect.Top = (float)(-Math.Log2((cd.RootFormula.ResolveFrequency(v) * (formula.RatioValue)) / v.Initial) * theme.Spacing_1D) - theme.Pitchline_Height / 2;
+                        rect.Top = (float)(-Math.Log2((cd.RootFormula.ResolveFrequency(v) * (formula.RatioValue)) / v.Initial) * v.Spacing_1D) - theme.Pitchline_Height / 2;
                         //}
                         if (theme.DimensionLineFromPosition[d] == theme.DimensionLineToPosition[d])
                         {
@@ -311,7 +311,7 @@ namespace Microtone.Services
                     plx2 = baseX + theme.Pitchline_Width;
                     plx2 += cd.HasDimensionlineAt(pl.Id, DimensionlinePosition.Right) ? 0 : theme.DimensionLine_Width;
                 }
-                var ply = (float)(-Math.Log2((cd.RootFormula.ResolveFrequency(v) * pl.Formula.RatioValue) / v.Initial) * theme.Spacing_1D);
+                var ply = (float)(-Math.Log2((cd.RootFormula.ResolveFrequency(v) * pl.Formula.RatioValue) / v.Initial) * v.Spacing_1D);
 
                 commands.Add(new SKHorizontalLineCommand()
                 {
