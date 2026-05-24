@@ -5,12 +5,12 @@ using Microtone.Views.Services;
 
 namespace Microtone.Views
 {
-    public partial class MainWindow : Window
+  public partial class MainWindow : Window
+  {
+    public MainWindow()
     {
-        public MainWindow()
-        {
-            InitializeComponent();
-            DataContext = new MainWindowViewModel(new DialogService(this));
-        }
+      InitializeComponent();
+      DataContext = new MainWindowViewModel(new DialogService(this));
     }
+  }
 }

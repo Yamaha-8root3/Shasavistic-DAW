@@ -3,7 +3,6 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="300" d:DesignHeight="120"
-        xmlns:microtone="using:Microtone"
         xmlns:vm="using:Microtone.ViewModels"
         x:Class="Microtone.Views.Dialogs.ChordInputDialog"
         x:DataType="vm:Dialogs.ChordInputDialogViewModel"

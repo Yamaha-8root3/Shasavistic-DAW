@@ -5,37 +5,40 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d" d:DesignWidth="200" d:DesignHeight="50"
-            x:Class="Microtone.Views.Controls.TimeIndicatorControl"             
-            x:DataType="controls:TimeIndicatorViewModel">
+             x:Class="Microtone.Views.Controls.TimeIndicatorControl"
+             x:DataType="controls:TimeIndicatorViewModel">
 
-    <Design.DataContext>
-		<controls:TimeIndicatorViewModel/>
-    </Design.DataContext>
-            
+  <Design.DataContext>
+    <controls:TimeIndicatorViewModel/>
+  </Design.DataContext>
+
   <StackPanel Orientation="Horizontal"
               >
 
-    <!-- モード切り替えボタン -->
-    <DropDownButton Content="{Binding ModeLabel}">
-    <DropDownButton.Flyout>
-        <MenuFlyout>
-            <MenuItem Header="音楽" Command="{Binding SetMusicModeCommand}"/>
-            <MenuItem Header="時間" Command="{Binding SetTimeModeCommand}"/>
-        </MenuFlyout>
-    </DropDownButton.Flyout>
-    </DropDownButton>
-    
+
     <Border Background="gray"
-        MinWidth="100"
-        IsHitTestVisible="True"
-        IsVisible="{Binding !IsEditing}"
-        PointerPressed="OnTextClicked">
-                <TextBlock Text="{Binding DisplayText}"
-                    VerticalAlignment="Center"
-                    TextAlignment="Center"
-                    FontSize="25"
-                    Margin="10,0,10,0"/>
+            MinWidth="100"
+            IsHitTestVisible="True"
+            IsVisible="{Binding !IsEditing}"
+            PointerPressed="OnTextClicked">
+      <TextBlock x:Name="displayText" Text="{Binding DisplayText}"
+                 VerticalAlignment="Center"
+                 TextAlignment="Center"
+                 FontSize="25"
+                 Margin="10,0,10,0"
+                 FontFamily="consolas">
+      </TextBlock>
+
+      <Border.ContextMenu>
+        <ContextMenu>
+          <MenuItem Header="Time" Command="{Binding SetTimeModeCommand}"/>
+          <MenuItem Header="Beat:Bar:Tick" Command="{Binding SetMusicModeCommand}"/>
+        </ContextMenu>
+      </Border.ContextMenu>
+
     </Border>
+
+
 
     <TextBox x:Name="editbox"
              Text="{Binding EditText}"
@@ -49,7 +52,8 @@
              TextAlignment="Center"
              Margin="10,0,10,0"
              FontSize="25"
-                />
+             FontFamily="consolas"
+             />
 
-</StackPanel>
+  </StackPanel>
 </UserControl>

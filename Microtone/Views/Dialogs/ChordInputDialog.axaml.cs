@@ -11,6 +11,11 @@ namespace Microtone.Views.Dialogs;
 public partial class ChordInputDialog : Window
 {
     private readonly Dimensions<int> offset1d;
+    public ChordInputDialog()
+    {
+        InitializeComponent();
+    }
+
     public ChordInputDialog(Dimensions<int> offset1d)
     {
         this.offset1d = offset1d;

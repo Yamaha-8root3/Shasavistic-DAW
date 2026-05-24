@@ -8,7 +8,7 @@ using System.Text;
 
 namespace Microtone.Models.Score.Timelines
 {
-    internal class ScoreTimeLine<T> : IScoreTimeline
+    public class ScoreTimeLine<T> : IScoreTimeline
                                         where T : ITimelinePoint
     {
         protected readonly Dictionary<Guid,T> _items = [];

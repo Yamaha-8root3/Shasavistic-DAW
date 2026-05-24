@@ -5,59 +5,62 @@
         xmlns:vm="using:Microtone.ViewModels"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:microtone="using:Microtone"
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         x:Class="Microtone.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/avalonia-logo.ico"
         Title="Microtone">
 
-    <Design.DataContext>
-        <!-- This only sets the DataContext for the previewer in an IDE,
-             to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
-        <vm:MainWindowViewModel/>
-    </Design.DataContext>
-    <DockPanel>
-        <StackPanel DockPanel.Dock="Bottom"
-               Height="20"
-               Background="Black"
-               Orientation="Horizontal">
-            <Label Content="{Binding #Timeline.Scale}"/>
-            <Label Content="{Binding #Timeline.Offset}"/>
-            <Label Content="{Binding #Timeline.PointerPosition}"/>
-            <Label Content="{Binding #Timeline.PointerHit.TargetId}"/>
-            <Popup PlacementTarget="{Binding #Timeline}"
-                   Placement="Pointer"
-                   IsOpen="True">
-				<Label Content="Test"></Label>
-            </Popup>
-        </StackPanel>
-        <StackPanel DockPanel.Dock="Top"
-                    Height="50"
-                    Background="Black"
-                    Orientation="Horizontal">
-            <Vcontrols:TimeIndicatorControl
-            DataContext="{Binding TimeIndicatorVM}"/>
-			
-        </StackPanel>
-        <Grid Margin="0">
-            <controls:DiagramTimeline
-            x:Name="Timeline"
-            Focusable="True"
-            RenderData="{Binding RenderData}"
-            OnScaleChangedCommand="{Binding OnScaleChangedCommand}"
-            OnPressedCommand="{Binding OnPressedCommand}"
-            OnDragCommand="{Binding OnDragCommand}"
-            OnDragReleasedCommand="{Binding OnDragReleasedCommand}"
-            OnRightClickedCommand="{Binding  OnRightClickedCommand}">
-                <controls:DiagramTimeline.ContextMenu>
-                    <ContextMenu>
-                        <MenuItem Header="和音図を配置"
-                                  Command="{Binding PlaceChordDiagramCommand}"/>
-                    </ContextMenu>
-                </controls:DiagramTimeline.ContextMenu>
-            </controls:DiagramTimeline>
-        </Grid>
-    </DockPanel>
+  <Design.DataContext>
+    <!-- This only sets the DataContext for the previewer in an IDE,
+    to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
+    <vm:MainWindowViewModel/>
+  </Design.DataContext>
+  <DockPanel>
+    <StackPanel DockPanel.Dock="Bottom"
+                Height="20"
+                Background="Black"
+                Orientation="Horizontal">
+      <Label Content="{Binding #TimelineControl.Scale}"/>
+      <Label Content="{Binding #TimelineControl.Offset}"/>
+      <Label Content="{Binding #TimelineControl.PointerPosition}"/>
+      <Label Content="{Binding #TimelineControl.PointerHit.TargetId}"/>
+      <Popup PlacementTarget="{Binding #TimelineControl}"
+             Placement="Pointer"
+             IsOpen="True">
+        <Label Content="Test"></Label>
+      </Popup>
+    </StackPanel>
+    <StackPanel DockPanel.Dock="Top"
+                Height="50"
+                Background="Black"
+                Orientation="Horizontal">
+      <Vcontrols:TimeIndicatorControl
+      DataContext="{Binding TimeIndicatorVM}"/>
+
+      <Button Command="{Binding PlayCommand}" IsEnabled="True">Play</Button>
+      
+      <Button Command="{Binding StopCommand}" IsEnabled="True">Stop</Button>
+
+    </StackPanel>
+    <Grid Margin="0">
+      <controls:DiagramTimeline
+      x:Name="TimelineControl"
+      Focusable="True"
+      RenderData="{Binding RenderData}"
+      OnScaleChangedCommand="{Binding OnScaleChangedCommand}"
+      OnPressedCommand="{Binding OnPressedCommand}"
+      OnDragCommand="{Binding OnDragCommand}"
+      OnDragReleasedCommand="{Binding OnDragReleasedCommand}"
+      OnRightClickedCommand="{Binding  OnRightClickedCommand}">
+        <controls:DiagramTimeline.ContextMenu>
+          <ContextMenu>
+            <MenuItem Header="和音図を配置"
+                      Command="{Binding PlaceChordDiagramCommand}"/>
+          </ContextMenu>
+        </controls:DiagramTimeline.ContextMenu>
+      </controls:DiagramTimeline>
+    </Grid>
+  </DockPanel>
 
 </Window>

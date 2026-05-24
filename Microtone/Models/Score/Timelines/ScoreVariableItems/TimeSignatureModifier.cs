@@ -6,7 +6,7 @@ using System.Text;
 
 namespace Microtone.Models.Score.Timelines.ScoreVariableItems
 {
-    internal class TimeSignatureModifier : ITimelinePoint
+    public class TimeSignatureModifier : ITimelinePoint
     {
         public Guid Id { get; } = Guid.NewGuid();
         public long StartTick { get; set; } = 0;

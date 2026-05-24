@@ -1,6 +1,8 @@
-﻿using ReactiveUI;
+﻿using Microtone.Models.Score.Timelines;
+using ReactiveUI;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reactive;
 using System.Text;
 
@@ -8,12 +10,20 @@ namespace Microtone.ViewModels.Controls
 {
     public class TimeIndicatorViewModel : ReactiveObject
     {
-        private long _currentTick;
-        public long CurrentTick
-        {
-            get => _currentTick;
-            set => this.RaiseAndSetIfChanged(ref _currentTick, value);
-        }
+
+    private TimeSignatureMap? _timeSignatureMap;
+    public TimeSignatureMap? TimeSignatureMap
+    {
+      get => _timeSignatureMap;
+      set => this.RaiseAndSetIfChanged(ref _timeSignatureMap, value);
+    }
+
+    private long _currentTick;
+    public long CurrentTick
+    {
+      get => _currentTick;
+      set => this.RaiseAndSetIfChanged(ref _currentTick, value);
+    }
 
         private bool _isMusicMode = true;
         public bool IsMusicMode
@@ -21,7 +31,6 @@ namespace Microtone.ViewModels.Controls
             get => _isMusicMode;
             set => this.RaiseAndSetIfChanged(ref _isMusicMode, value);
         }
-        public string ModeLabel => IsMusicMode ? "音楽" : "時間";
 
         private bool _isEditing;
         public bool IsEditing
@@ -54,19 +63,60 @@ namespace Microtone.ViewModels.Controls
             .Subscribe(_ =>
             {
                 this.RaisePropertyChanged(nameof(DisplayText));
-                this.RaisePropertyChanged(nameof(ModeLabel));
             });
         }
 
-        public void CommitEdit(string input)
-        {
-            var tick = IsMusicMode ? ParseMusicString(input) : ParseTimeString(input);
-            if (tick.HasValue) CurrentTick = tick.Value;
-        }
-
-        private string TickToMusicString(long tick) => $"{tick}"; // 仮
-        private string TickToTimeString(long tick) => $"{tick}";  // 仮
-        private long? ParseMusicString(string s) => long.TryParse(s, out var v) ? v : null;
-        private long? ParseTimeString(string s) => long.TryParse(s, out var v) ? v : null;
+    private string TickToMusicString(long tick)
+    {
+      if (_timeSignatureMap == null) return $"{tick}";
+      var (bar, beat, rem) = _timeSignatureMap.TickToBarBeat(tick); // Math.Abs削除
+      if (tick < 0)
+        return $"-{bar} : {beat} : {rem:D3}";
+      return $"{bar} : {beat} : {rem:D3}";
     }
+
+    private string TickToTimeString(long tick)
+    {
+      if (_timeSignatureMap == null) return $"{tick}";
+      double sec = _timeSignatureMap.TickToSeconds(Math.Abs(tick));
+      var ts = TimeSpan.FromSeconds(sec);
+      if (tick < 0)
+        return $"-{ts.Minutes:D2}:{ts.Seconds:D2}.{ts.Milliseconds:D3}";
+      return $"{ts.Minutes:D2}:{ts.Seconds:D2}.{ts.Milliseconds:D3}";
+    }
+
+    public void CommitEdit(string input)
+    {
+      if (IsMusicMode)
+      {
+        // "小節 : 拍 : tick" or 整数
+        var parts = input.Split(':');
+        if (parts.Length == 3 &&
+            int.TryParse(parts[0].Trim(), out int bar) &&
+            int.TryParse(parts[1].Trim(), out int beat) &&
+            int.TryParse(parts[2].Trim(), out int rem) &&
+            _timeSignatureMap != null)
+        {
+          CurrentTick = _timeSignatureMap.BarBeatToTick(bar, beat, rem);
+          return;
+        }
+      }
+      var tick = ParseTimeString(input);
+      if (tick.HasValue) CurrentTick = tick.Value;
+    }
+
+    // ParseTimeStringは秒入力("mm:ss.ms")対応
+    private long? ParseTimeString(string s)
+    {
+      if (long.TryParse(s, out var v)) return v;
+      // mm:ss.ms
+      if (TimeSpan.TryParseExact(s, @"mm\:ss\.fff", null, out var ts) && _timeSignatureMap != null)
+      {
+        // 秒→Tick (簡易: 最初のBPMのみ)
+        double bpm = _timeSignatureMap.Items.FirstOrDefault()?.Bpm ?? 120;
+        return (long)(ts.TotalSeconds * _timeSignatureMap.PPQ * bpm / 60.0);
+      }
+      return null;
+    }
+  }
 }

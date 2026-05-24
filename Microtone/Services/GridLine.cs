@@ -14,78 +14,82 @@ namespace Microtone.Services
         // StepDivisor: fineStep が何個ごとにこの色か
         public record GridLineColors(GridLineColor[] Levels, SKColor Fallback);
 
-        public static GridLineColors BuildGridLineColors(int ppq, int division, ScoreRenderTheme theme)
+    /// <param name="totalSteps">1小節あたりの最小グリッド数 = BeatPerBar * division / BeatType</param>
+    public static GridLineColors BuildGridLineColors(int totalSteps, ScoreRenderTheme theme)
+    {
+      var levels = new List<GridLineColor>();
+
+      for (int div = totalSteps; div >= 1; div--)
+      {
+        if (totalSteps % div != 0) continue;
+
+        int noteUnit = totalSteps / div;
+
+        if (IsPowerOfTwo(noteUnit))
         {
-            var levels = new List<GridLineColor>();
-
-
-            for (int i = 1; i <= division; i++)
-            {
-                int div = division / GCD(i, division); // i/divisionを約分して分母を求める
-                //if (levels.Exists(l => l.StepDivisor == div)) continue; // すでに同じStepDivisorがある場合はスキップ
-                if (IsPowerOfTwo(div) || div == 1) // 分母が2のべき乗か1
-                {
-                    int powerOfTwo = (int)(Math.Log(div, 2)); // 2の何乗か
-                    if (powerOfTwo < theme.GridPow2Colors.Length)
-                    {
-                        levels.Add(new GridLineColor(i, theme.GridPow2Colors[powerOfTwo]));
-                    }
-                }
-                else // それ以外は素数で判定
-                {
-                    long oddPrime = 1;
-                    while (div % 2 == 0) div /= 2; // 2で割り切れる限り割る
-                    for (int k = 0; k < theme.GridPrimeColors.Length; k++)
-                    {
-                        oddPrime = NextOddPrime(oddPrime);
-                        if (div % oddPrime == 0)
-                        {
-                            levels.Add(new GridLineColor(i , theme.GridPrimeColors[k]));
-                            break;
-                        }
-                    }
-                }
-            }
-
-
-            //for (int i = 1; i <= division; i++)
-            //{
-            //    var powerof2 = 0;
-            //    var i_ = i;
-            //    while (i_ % 2 == 0)
-            //    {
-            //        powerof2++;
-            //        i_ /= 2;
-            //    }
-            //    if ((powerof2 > 0 && i_ == 1) || i == 1) {
-            //        //色指定がある場合のみ
-            //        if (powerof2 < theme.GridPow2Colors.Length)
-            //            levels.Add(new GridLineColor(division / i, theme.GridPow2Colors[powerof2]));
-            //    }
-            //    else
-            //    {
-            //        var oddprime = 1L;
-            //        for (int k = 0; k < theme.GridPrimeColors.Length; k++)
-            //        {
-            //            oddprime = NextOddPrime(oddprime);
-            //            if (i_ % oddprime == 0)
-            //            {
-            //                if (levels.Exists(l => l.StepDivisor == division / i)) break; // 2系でカバーされている位置は除外
-            //                levels.Add(new GridLineColor(division / i, theme.GridPrimeColors[k]));
-            //                break;
-            //            }
-            //        }
-            //    }
-
-            //}
-
-
-            // StepDivisor 降順（粗い順）でソート → Render側で先頭から見て最初に割り切れた色を使う
-            levels.Sort((a, b) => b.StepDivisor.CompareTo(a.StepDivisor));
-            return new GridLineColors([.. levels], theme.GridFallbackColor);
+          int pow = (int)Math.Log2(noteUnit);
+          if (pow < theme.GridPow2Colors.Length)
+            levels.Add(new GridLineColor(div, theme.GridPow2Colors[pow]));
         }
+        else
+        {
+          int reduced = noteUnit;
+          while (reduced % 2 == 0) reduced /= 2;
+          long oddPrime = 1;
+          for (int k = 0; k < theme.GridPrimeColors.Length; k++)
+          {
+            oddPrime = NextOddPrime(oddPrime);
+            if (reduced % oddPrime == 0)
+            {
+              levels.Add(new GridLineColor(div, theme.GridPrimeColors[k]));
+              break;
+            }
+          }
+        }
+      }
 
-        public static SKGridCommand BuildGridCommand(
+      levels.Sort((a, b) => b.StepDivisor.CompareTo(a.StepDivisor));
+      return new GridLineColors([.. levels], theme.GridFallbackColor);
+    }
+    public static GridLineColors BuildGridLineColors(int ppq, int division, ScoreRenderTheme theme)
+    {
+      var levels = new List<GridLineColor>();
+
+      for (int div = division; div >= 1; div--)
+      {
+        if (division % div != 0) continue;
+
+        // division/div = 何分音符か（1=全音符, 2=2分, 4=4分...）
+        int noteUnit = division / div;
+
+        if (IsPowerOfTwo(noteUnit))
+        {
+          int pow = (int)Math.Log2(noteUnit);
+          if (pow < theme.GridPow2Colors.Length)
+            levels.Add(new GridLineColor(div, theme.GridPow2Colors[pow]));
+        }
+        else
+        {
+          int reduced = noteUnit;
+          while (reduced % 2 == 0) reduced /= 2;
+          long oddPrime = 1;
+          for (int k = 0; k < theme.GridPrimeColors.Length; k++)
+          {
+            oddPrime = NextOddPrime(oddPrime);
+            if (reduced % oddPrime == 0)
+            {
+              levels.Add(new GridLineColor(div, theme.GridPrimeColors[k]));
+              break;
+            }
+          }
+        }
+      }
+
+      levels.Sort((a, b) => b.StepDivisor.CompareTo(a.StepDivisor));
+      return new GridLineColors([.. levels], theme.GridFallbackColor);
+    }
+
+    public static SKGridCommand BuildGridCommand(
             long sectionStartTick, long sectionEndTick,
             ScoreVariables v, GridLineColors colors, int division, ScoreRenderTheme theme)
         {
