@@ -1,4 +1,5 @@
-﻿using Microtone.Models.Rendering;
+﻿using Microtone.Interfaces.Editor;
+using Microtone.Models.Rendering;
 using Microtone.Models.Score;
 using Microtone.Models.Score.Pitch;
 using Microtone.Services;
@@ -26,8 +27,8 @@ namespace Microtone.Models
       Score.DefiningChordMap.Add(new(new([0, 1]), new([0, 0, 0, 1])));
     }
 
-    public SKRenderData BuildRenderData(Guid? selectedId = null, IReadOnlyDictionary<Guid, long>? tickOverrides = null)
-        => DiagramTimelineRenderDataBuilder.Build(this, selectedId, tickOverrides);
+    public SKRenderData BuildRenderData(ISelectionState? selectionState, IReadOnlyDictionary<Guid, long>? tickOverrides = null)
+        => DiagramTimelineRenderDataBuilder.Build(this, selectionState, tickOverrides);
 
     public SKRenderCommand BuildCursor(long tick)
         => DiagramTimelineRenderDataBuilder.BuildCursor(this, tick);

@@ -1,6 +1,7 @@
 ﻿using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Shapes;
 using Microsoft.VisualBasic;
+using Microtone.Interfaces.Editor;
 using Microtone.Interfaces.Score;
 using Microtone.Interfaces.Score.Pitch;
 using Microtone.Models;
@@ -12,6 +13,7 @@ using Microtone.Models.Score.Pitch;
 using Microtone.Models.Score.Timelines.ScoreItems;
 using Microtone.Models.Score.Timelines.ScoreItems.PitchLine;
 using Microtone.Models.Score.Timelines.ScoreVariableItems;
+using Microtone.Services.Editor.Selection;
 using SkiaSharp;
 using System;
 using System.Collections.Generic;
@@ -25,7 +27,7 @@ namespace Microtone.Services
 {
   internal class DiagramTimelineRenderDataBuilder
   {
-    public static SKRenderData Build(ScoreSession session, Guid? selectedId = null, IReadOnlyDictionary<Guid, long>? displayTickOverrides = null)
+    public static SKRenderData Build(ScoreSession session, ISelectionState? selectionState = null, IReadOnlyDictionary<Guid, long>? displayTickOverrides = null)
     {
       var score = session.Score;
       var theme = session.Theme;
@@ -143,21 +145,24 @@ namespace Microtone.Services
             break;
 
           case ChordDiagram cd:
-            var cdselected = (selectedId.HasValue && cd.Id == selectedId.Value);
+            var cdselected = (selectionState as ChordDiagramSelection)?.Ids.Contains(cd.Id) == true ||
+                             (selectionState as PitchlineSelection)?.ParentChordDiagramId == cd.Id;
             long? cd_overrideTick = null;
             if (displayTickOverrides?.TryGetValue(cd.Id, out var cd_ot) == true)
               cd_overrideTick = cd_ot;
-            data.Commands.AddRange(ChordDiagramFactory.BuildChordDiagramWithLayout(cd, v, theme, paint, cdselected, cd_overrideTick));
+            data.Commands.AddRange(ChordDiagramFactory.BuildChordDiagramWithLayout(cd, v, theme, paint,
+              cdselected ? selectionState : null, cd_overrideTick));
 
             break;
 
           case DetailedFunctograph f:
-            var fselected = (selectedId.HasValue && f.Id == selectedId.Value);
+            var fselected = (selectionState as ChordDiagramSelection)?.Ids.Contains(f.Id) == true ||
+                            (selectionState as PitchlineSelection)?.ParentChordDiagramId == f.Id;
             long? f_overrideTick = null;
             if (displayTickOverrides?.TryGetValue(f.Id, out var f_ot) == true)
               f_overrideTick = f_ot;
             data.Commands.AddRange(ChordDiagramFactory.BuildChordDiagramWithLayout(f.ToChordDiagram(v.definingChord, v.Dimension1DOffset),
-                                                                        v, theme, paint, fselected, f_overrideTick));
+                                                                        v, theme, paint, fselected ? selectionState : null, f_overrideTick));
             break;
 
 

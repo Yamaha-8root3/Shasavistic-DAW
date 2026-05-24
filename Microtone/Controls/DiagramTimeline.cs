@@ -31,7 +31,7 @@ namespace Microtone.Controls
     private bool _initialized;
     private bool _isDraggingObject;
 
-    public record PressedInfo(HitInfo? Hit, Point WorldPos);
+    public record PressedInfo(HitInfo? Hit, Point WorldPos, KeyModifiers Modifiers);
 
     //bindできるものを定義
     public static readonly StyledProperty<SKRenderData?> RenderDataProperty =
@@ -257,7 +257,7 @@ namespace Microtone.Controls
       }
       var worldPos = new SKPoint((float)PointerPosition.X, (float)PointerPosition.Y);
       var hit = hitTestManager.HitTest(worldPos);
-      OnPressedCommand?.Execute(new PressedInfo(hit,PointerPosition));
+      OnPressedCommand?.Execute(new PressedInfo(hit,PointerPosition,e.KeyModifiers));
 
       if (e.GetCurrentPoint(this).Properties.IsRightButtonPressed) return;
 

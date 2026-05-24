@@ -1,6 +1,7 @@
 ﻿using Avalonia;
 using CommunityToolkit.Mvvm.Input;
 using Microtone.Interfaces;
+using Microtone.Interfaces.Editor;
 using Microtone.Models;
 using Microtone.Models.Rendering;
 using Microtone.Models.Rendering.HitTest;
@@ -11,6 +12,7 @@ using Microtone.Models.Score.Timelines.ScoreItems;
 using Microtone.Models.Score.Timelines.ScoreItems.PitchLine;
 using Microtone.Services;
 using Microtone.Services.Editor;
+using Microtone.Services.Editor.Selection;
 using Microtone.ViewModels.Controls;
 using ReactiveUI;
 using System;
@@ -34,12 +36,12 @@ namespace Microtone.ViewModels
       get => _renderData;
       private set => SetProperty(ref _renderData, value);
     }
-    private Guid? _selectedChordDiagramId;
-    public Guid? SelectedChordDiagramId
-    {
-      get => _selectedChordDiagramId;
-      private set => SetProperty(ref _selectedChordDiagramId, value);
-    }
+    //private Guid? _selectedChordDiagramId;
+    //public Guid? SelectedChordDiagramId
+    //{
+    //  get => _selectedChordDiagramId;
+    //  private set => SetProperty(ref _selectedChordDiagramId, value);
+    //}
     private long _cursorTick = 0;
     public long CursorTick
     {
@@ -63,6 +65,10 @@ namespace Microtone.ViewModels
     private ScoreEditor _editor;
 
     private DragSession? _dragSession = null;
+
+    ISelectionState _selection;
+    private object? _pendingSelection = null;
+
     private Point _rightClickWorldPos;
 
     public MainWindowViewModel(IDialogService dialogService)
@@ -82,7 +88,7 @@ namespace Microtone.ViewModels
       PlayCommand = new RelayCommand(Play, () => !IsPlaying);
       StopCommand = new RelayCommand(Stop, () => IsPlaying);
 
-      TimeIndicatorVM = new TimeIndicatorViewModel { TimeSignatureMap = score.TimeSignatureMap ,CurrentTick = CursorTick};
+      TimeIndicatorVM = new TimeIndicatorViewModel { TimeSignatureMap = score.TimeSignatureMap, CurrentTick = CursorTick };
       TimeIndicatorVM.WhenAnyValue(x => x.CurrentTick)
         .Subscribe(tick => UpdateCursorTick(tick));
       score.BenchMarkMap.Add(new(
@@ -98,8 +104,8 @@ namespace Microtone.ViewModels
 
       var cd = new ChordDiagram { StartTick = 0, LengthTick = 240 };
       var a = cd.AddPitchLine(new Harmonograph([0]).ToOvertoneFormula(score.Dimension1DOffset));
-      var b = cd.AddPitchLine(new Harmonograph([1,-1,0,1]).ToOvertoneFormula(score.Dimension1DOffset));
-      cd.AddDimensionlineChain(a.Id,b.Id, score.Dimension1DOffset);
+      var b = cd.AddPitchLine(new Harmonograph([1, -1, 0, 1]).ToOvertoneFormula(score.Dimension1DOffset));
+      cd.AddDimensionlineChain(a.Id, b.Id, score.Dimension1DOffset);
       score.ScoreTimeLines[0].Add(cd);
 
       var data = DiagramTimelineRenderDataBuilder.Build(_session);
@@ -109,7 +115,7 @@ namespace Microtone.ViewModels
 
     private void RebuildRenderData()
     {
-      RenderData = _session.BuildRenderData(SelectedChordDiagramId, _dragSession?.DisplayTicks);
+      RenderData = _session.BuildRenderData(_selection, _dragSession?.DisplayTicks);
       // 差し替え後に現在のカーソルを再適用
       UpdateCursorTick(_cursorTick);
     }
@@ -122,40 +128,86 @@ namespace Microtone.ViewModels
     private void OnPressed(PressedInfo? info)
     {
       if (info == null) return;
-      if (info.Hit == null || info.Hit.Kind != HitKind.ChordDiagramBody)
+      if (info.Hit == null || info.Hit.Kind == HitKind.None)
       {
         // 空白クリック → 選択解除
-        SelectedChordDiagramId = null;
+        _selection?.Clear();
         CursorTick = _grid.SnapEnabled ?
           GridSnapper.SnapTick((long)(info.WorldPos.X / _session.PixelPerQuarter * score.TimeSignatureMap.PPQ), score.TimeSignatureMap, _grid.Division, 100) :
           (long)(info.WorldPos.X / _session.PixelPerQuarter * score.TimeSignatureMap.PPQ);
+        RebuildRenderData();
+        return;
       }
-      else
+      //TODO Addictive = falseになっているが就職キー対応
+      //info.Modifiers利用
+      switch (info.Hit.Kind)
       {
-        SelectedChordDiagramId = info.Hit.TargetId;
-        CursorTick = score.ScoreTimeLines
-          .SelectMany(t => t.Items)
-          .FirstOrDefault(i => i.Id == SelectedChordDiagramId)?.StartTick ?? CursorTick;
+        case HitKind.ChordDiagramBody:
+          bool additive = info.Modifiers == Avalonia.Input.KeyModifiers.Control;
+          if (_selection is not ChordDiagramSelection cdSel)
+            _selection = cdSel = new ChordDiagramSelection();
+
+          _pendingSelection = cdSel.Ids.Contains(info.Hit.TargetId) && !additive
+              ? info.Hit.TargetId        // pending
+              : null;                    // 即選択
+
+          if (_pendingSelection == null)
+            _selection.Select(info.Hit.TargetId, additive);
+
+          CursorTick = _editor.FindItem(info.Hit.TargetId)?.StartTick ?? CursorTick;
+          break;
+        case HitKind.Pitchline:
+          if (_selection is not PitchlineSelection)
+            _selection = new PitchlineSelection();
+          if (info.Hit.Attributes.TryGetValue("PitchlineId", out var plIdObj) && plIdObj is int plId)
+          {
+            _selection.Select((info.Hit.TargetId, plId), false);
+          }
+          break;
       }
       RebuildRenderData();
     }
 
     private void OnDrag(DragInfo? info)
     {
-      if (SelectedChordDiagramId == null || info == null) return;
-      _dragSession ??= new DragSession([_editor.FindItem(SelectedChordDiagramId.Value)!]);
 
+      switch (_selection)
+      {
+        case ChordDiagramSelection cds:
+          if (cds == null || cds.IsEmpty || info == null) break;
+          _dragSession ??= new DragSession(
+            cds.Ids.Select(id => _editor.FindItem(id)!).Where(x => x != null));
+          break;
+      }
+
+      //if (SelectedChordDiagramId == null || info == null) return;
+      //_dragSession ??= new DragSession([_editor.FindItem(SelectedChordDiagramId.Value)!]);
+      if (_dragSession == null || info == null) return;
       long rawOffset = _editor.PixelToTick(info.DragDelta.X); // ← Editorへ委譲
-      long snappedOffset = _editor.SnapDragOffset(_dragSession.OriginalTicks.Values.Min() , rawOffset);
+      long snappedOffset = _editor.SnapDragOffset(_dragSession.OriginalTicks.Values.Min(), rawOffset);
       _dragSession.SetOffset(snappedOffset);
       RebuildRenderData();
     }
 
     private void OnDragReleased()
     {
-      if (_dragSession == null) return;
-      _editor.CommitDrag(_dragSession);
-      _dragSession = null;
+      if (_dragSession != null)
+      {
+        // ドラッグした → 選択維持
+        _editor.CommitDrag(_dragSession);
+        _dragSession = null;
+      }
+      else if (_pendingSelection != null)
+      {
+        // ドラッグしなかった → 単一選択に絞る
+        switch (_selection)
+        {
+          case ChordDiagramSelection cdSel when _pendingSelection is Guid id && cdSel.Ids.Contains(id):
+            _selection.Select(id, false);
+            break;
+        }
+      }
+      _pendingSelection = null;
       RebuildRenderData();
     }
 
@@ -164,9 +216,10 @@ namespace Microtone.ViewModels
     private void OnRightClicked(Point worldPos)
     {
       _rightClickWorldPos = worldPos;
-      if (SelectedChordDiagramId != null)
+      switch (_selection)
       {
-
+        case ChordDiagramSelection cds:
+          break;
       }
     }
 

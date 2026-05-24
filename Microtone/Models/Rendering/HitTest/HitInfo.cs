@@ -19,5 +19,6 @@ namespace Microtone.Models.Rendering.HitTest
     {
         None,
         ChordDiagramBody,
-    }
+        Pitchline,
+  }
 }
