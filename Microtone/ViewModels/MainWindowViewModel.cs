@@ -58,7 +58,6 @@ namespace Microtone.ViewModels
 
     private ScoreSession _session = new();
     private ScoreData score => _session.Score;
-    private ScoreRenderTheme theme => _session.Theme;
     private GridSettings _grid => _session.Grid;
 
     private ScoreEditor _editor;
@@ -86,9 +85,6 @@ namespace Microtone.ViewModels
       TimeIndicatorVM = new TimeIndicatorViewModel { TimeSignatureMap = score.TimeSignatureMap ,CurrentTick = CursorTick};
       TimeIndicatorVM.WhenAnyValue(x => x.CurrentTick)
         .Subscribe(tick => UpdateCursorTick(tick));
-      //0tick BPM120 4/4
-      //score.TimeSignatureMap.Add(new(480*4, 180, 4, 4));
-      //0tick Tonic to <0D>
       score.BenchMarkMap.Add(new(
           -200,
           new InitialCenteredPitch(new([0])),
@@ -100,6 +96,11 @@ namespace Microtone.ViewModels
 
       score.DefiningChordMap.Add(new(new([0, 1]), new([0, 0, 0, 1])));
 
+      var cd = new ChordDiagram { StartTick = 0, LengthTick = 240 };
+      var a = cd.AddPitchLine(new Harmonograph([0]).ToOvertoneFormula(score.Dimension1DOffset));
+      var b = cd.AddPitchLine(new Harmonograph([1,-1,0,1]).ToOvertoneFormula(score.Dimension1DOffset));
+      cd.AddDimensionlineChain(a.Id,b.Id, score.Dimension1DOffset);
+      score.ScoreTimeLines[0].Add(cd);
 
       var data = DiagramTimelineRenderDataBuilder.Build(_session);
 
