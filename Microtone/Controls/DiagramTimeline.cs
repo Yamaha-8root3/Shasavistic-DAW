@@ -1,30 +1,24 @@
 ﻿using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.Documents;
 using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Platform;
 using Avalonia.Rendering.SceneGraph;
 using Avalonia.Skia;
-using Microtone.Models;
-using Microtone.Models.DiagramTimeline.Rendering;
 using Microtone.Models.Rendering;
 using Microtone.Models.Rendering.HitTest;
 using SkiaSharp;
 using System;
-using System.Diagnostics;
-using System.Linq;
-using System.Reflection;
-using System.Security.Cryptography;
 using System.Windows.Input;
 
 namespace Microtone.Controls
 {
   public class DiagramTimeline : Control
   {
-    Point _mouse;
-    Point? _lastDrag;
-    Point? _dragStartWorld;
+    private Point _mouse;
+    private Point? _lastDrag;
+    private Point? _dragStartWorld;
+    private Point? _dragStartScreen;
 
     private readonly HitTestManager hitTestManager = new();
     private SKRenderData? _prevRenderData;
@@ -79,7 +73,7 @@ namespace Microtone.Controls
     }
 
     public static readonly StyledProperty<HitInfo?> PointerHitProperty =
-        AvaloniaProperty.Register<DiagramTimeline, HitInfo?>(nameof(PointerHit), null, defaultBindingMode: Avalonia.Data.BindingMode.OneWayToSource);
+        AvaloniaProperty.Register<DiagramTimeline, HitInfo?>(nameof(PointerHit), defaultBindingMode: Avalonia.Data.BindingMode.OneWayToSource);
     public HitInfo? PointerHit
     {
       get => GetValue(PointerHitProperty);
@@ -265,27 +259,28 @@ namespace Microtone.Controls
       if (ContextMenu?.IsOpen == true)
       {
         ContextMenu.Close();
-        _mouse = e.GetPosition(this);
-        RefreshPointerPosition();
       }
+      _mouse = e.GetPosition(this);
+      RefreshPointerPosition();
       var worldPos = new SKPoint((float)PointerPosition.X, (float)PointerPosition.Y);
       var hit = hitTestManager.HitTest(worldPos);
       _lastPressedHit = hit;
-      OnPressedCommand?.Execute(new ClickedInfo(hit, PointerPosition, GetMouseButton(e), e.KeyModifiers));
+      OnPressedCommand.Execute(new ClickedInfo(hit, PointerPosition, GetMouseButton(e), e.KeyModifiers));
 
       if (e.GetCurrentPoint(this).Properties.IsRightButtonPressed) return;
 
       e.Pointer.Capture(this);
       _lastDrag = e.GetPosition(this);
+      _dragStartScreen = e.GetPosition(this);
       _dragStartWorld = new(worldPos.X, worldPos.Y);
-      _isDraggingObject = hit != null && hit?.Kind != HitKind.None;
+      _isDraggingObject = hit != null && hit.Kind != HitKind.None;
     }
     protected override void OnPointerMoved(PointerEventArgs e)
     {
       var p = e.GetPosition(this);
       _mouse = p;
-      PointerHit = hitTestManager.HitTest(new((float)PointerPosition.X, (float)PointerPosition.Y));
       RefreshPointerPosition();
+      PointerHit = hitTestManager.HitTest(new((float)PointerPosition.X, (float)PointerPosition.Y));
       if (_lastDrag != null)
       {
         var delta = p - _lastDrag.Value;
@@ -309,7 +304,7 @@ namespace Microtone.Controls
             )
           };
 
-          OnDragCommand?.Execute(info);
+          OnDragCommand.Execute(info);
         }
         else
         {
@@ -322,19 +317,19 @@ namespace Microtone.Controls
     }
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
-      bool didDrag =
-        _dragStartWorld.HasValue && (PointerPosition - _dragStartWorld.Value).ToSKPoint().Length > 5;
+      var didDrag =
+        _dragStartScreen.HasValue && ( e.GetPosition(this) - _dragStartScreen.Value).ToSKPoint().Length > 5;
       if (!didDrag)
       {
-        OnClickedCommand?.Execute(new ClickedInfo(
+        OnClickedCommand.Execute(new ClickedInfo(
             _lastPressedHit,
             PointerPosition,
             e.InitialPressMouseButton,
             e.KeyModifiers
         ));
       }
-      else if (_isDraggingObject)
-        OnDragReleasedCommand?.Execute(null);
+      else
+        OnDragReleasedCommand.Execute(null);
 
       if (e.InitialPressMouseButton == MouseButton.Right)
         ContextMenu?.Open();
@@ -342,6 +337,7 @@ namespace Microtone.Controls
       _lastDrag = null;
       _isDraggingObject = false;
       _dragStartWorld = null;
+      _dragStartScreen = null;
       e.Pointer.Capture(null);
     }
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
@@ -367,14 +363,14 @@ namespace Microtone.Controls
         // スケール更新後、同じワールド座標が同じスクリーン位置になるようにオフセットを再計算する:
         // world = (mouse - offset) / scaleの変形
         Offset = new Point(
-            (float)screen.X - (worldBefore.X) * Scale.X,
-            (float)screen.Y - (worldBefore.Y) * Scale.Y
+            screen.X - (worldBefore.X) * Scale.X,
+            screen.Y - (worldBefore.Y) * Scale.Y
         );
         InvalidateVisual();
       }
       else if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
       {
-        OnScaleChangedCommand?.Execute(e.Delta.Y);
+        OnScaleChangedCommand.Execute(e.Delta.Y);
       }
       else
       {
@@ -395,7 +391,6 @@ namespace Microtone.Controls
 
       var topLevel = TopLevel.GetTopLevel(this);
       if (topLevel == null) return;
-      var scaling = topLevel.RenderScaling;
 
       // ワールド→コントロール相対座標
       var ctrlTL = new Point(
@@ -404,37 +399,11 @@ namespace Microtone.Controls
       var ctrlBR = new Point(
           hit.Bounds.Right * Scale.X + Offset.X,
           hit.Bounds.Bottom * Scale.Y + Offset.Y);
-
-      // コントロール相対→スクリーン→ウィンドウ相対
-      var controlOrigin = this.PointToScreen(new Point(0, 0));
-      var screenTL = this.PointToScreen(ctrlTL);
-      var screenBR = this.PointToScreen(ctrlBR);
+      
 
       SelectedHitBoundScreen = new Rect(
           ctrlTL,ctrlBR);
 
-
-
-      if (topLevel != null)
-      {
-        //var screenPoint2 = _mouse;
-        //var windowOrigin2 = new Point(0, 0);
-        //var scaling2 = topLevel.RenderScaling;
-        //var windowX = (screenPoint2.X - windowOrigin2.X) / scaling2;
-        //var windowY = (screenPoint2.Y - windowOrigin2.Y) / scaling2;
-        //System.Diagnostics.Debug.WriteLine(
-            //$"Mouse(control):{_mouse} → Window:{windowX:F1},{windowY:F1} Scaling:{scaling}");
-        //SelectedHitBoundScreen = new Rect(controlOrigin.X, controlOrigin.Y, 0,0);
-      }
-      if (hit != null)
-      {
-        System.Diagnostics.Debug.WriteLine(
-            $"Mouse(control):{_mouse.X:F1},{_mouse.Y:F1} \n" +
-            $"Id:{SelectedItemId}" +
-            $"Hit Bounds(World):{hit.Bounds.Left:F1},{hit.Bounds.Top:F1},{hit.Bounds.Right:F1},{hit.Bounds.Bottom:F1} \n" +
-            $"ctrlTL:{ctrlTL.X:F1},{ctrlTL.Y:F1} ctrlBR:{ctrlBR.X:F1},{ctrlBR.Y:F1} "
-);
-      }
     }
     private MouseButton GetMouseButton(PointerPressedEventArgs EventArgs)
     {

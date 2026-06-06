@@ -1,7 +1,6 @@
 ﻿using Microtone.Interfaces.Editor;
 using System;
 using System.Collections.Generic;
-using System.Text;
 
 namespace Microtone.Services.Editor.Selection
 {

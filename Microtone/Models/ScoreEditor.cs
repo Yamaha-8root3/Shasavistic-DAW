@@ -77,12 +77,11 @@ namespace Microtone.Models
       long leftLimit = _session.Score.BenchMarkMap.Items[0].StartTick;
       foreach (var (id, originalTick) in dragSession.OriginalTicks)
       {
-        var item = _session.Score.ScoreTimeLines
-            .SelectMany(t => t.Items)
-            .FirstOrDefault(i => i.Id == id);
-        if (item != null)
-          item.StartTick = Math.Max(leftLimit, originalTick + dragSession.SnappedOffsetTick);
+        long newTick = Math.Max(leftLimit, originalTick + dragSession.SnappedOffsetTick);
+        foreach (var tl in _session.Score.ScoreTimeLines)
+          tl.UpdateTick(id, newTick);
       }
+      
     }
 
     // アイテム逆引き

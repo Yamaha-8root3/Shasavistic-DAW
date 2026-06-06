@@ -1,25 +1,14 @@
 ﻿using Microtone.Models.Enums;
 using SkiaSharp;
 using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Microtone.Models.Score
 {
     public struct ScoreRenderTheme
     {
         public ScoreRenderTheme() { }
-        public event Action? Changed;
-       
-        //public enum DimensionLinePosition
-        //{
-        //    Left = 0,
-        //    Right = 1,
-        //    Center = 2,
-        //}
+        
         public SKColor Background = new(103, 102, 129);
-        //public float Spacing_1D = 200f;
-        //public float PixelPerQuarter = 100f;
 
     public Dimensions<SKColor> DimensionColor = new([
             new SKColor(254,254,254), // 1D

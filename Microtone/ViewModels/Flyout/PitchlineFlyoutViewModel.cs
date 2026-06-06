@@ -88,6 +88,8 @@ namespace Microtone.ViewModels.Flyout
                 _selection.Deselect(plId);
                 _selection.Select(newPl.Id,true);
             }
+            OnPropertyChanged(nameof(IsOmitted));
+            OnPropertyChanged(nameof(IsBase));
             _onChanged();
         }
 
@@ -107,6 +109,9 @@ namespace Microtone.ViewModels.Flyout
                     _selection.Select(remaining.First().Id,true);
                 }
             }
+            OnPropertyChanged(nameof(IsSinglePitchline));
+            OnPropertyChanged(nameof(IsOmitted));
+            OnPropertyChanged(nameof(IsBase));
             _onChanged();
         }
 

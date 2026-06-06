@@ -50,46 +50,62 @@
       <Button Command="{Binding StopCommand}">Stop</Button>
 
     </StackPanel>
-    <Grid Margin="0">
-      <controls:DiagramTimeline
-      x:Name="TimelineControl"
-      Focusable="True"
-      RenderData="{Binding RenderData}"
-      OnScaleChangedCommand="{Binding OnScaleChangedCommand}"
-      OnPressedCommand="{Binding OnPressedCommand}"
-      OnDragCommand="{Binding OnDragCommand}"
-      OnDragReleasedCommand="{Binding OnDragReleasedCommand}"
-      OnClickedCommand="{Binding OnClickedCommand}"
-      Scale="{Binding TimelineScale, Mode=OneWayToSource}"
-      Offset="{Binding TimelineOffset, Mode=OneWayToSource}"
-      SelectedItemId="{Binding SelectedItemId}"
-      SelectedHitBoundScreen="{Binding SelectedHitBoundScreen, Mode=OneWayToSource}"
-      >
-        <controls:DiagramTimeline.ContextMenu>
-          <ContextMenu>
-            <MenuItem Header="和音図を配置"
-                      Command="{Binding PlaceChordDiagramCommand}"/>
-            <MenuItem Header="新しい和音" Command="{Binding PlaceEmptyChordDiagramCommand}"></MenuItem>
-          </ContextMenu>
-        </controls:DiagramTimeline.ContextMenu>
-      </controls:DiagramTimeline>
+      <Grid Margin="0" ClipToBounds="True">
+        <controls:DiagramTimeline
+          x:Name="TimelineControl"
+          Focusable="True"
+          RenderData="{Binding RenderData}"
+          OnScaleChangedCommand="{Binding OnScaleChangedCommand}"
+          OnPressedCommand="{Binding OnPressedCommand}"
+          OnDragCommand="{Binding OnDragCommand}"
+          OnDragReleasedCommand="{Binding OnDragReleasedCommand}"
+          OnClickedCommand="{Binding OnClickedCommand}"
+          Scale="{Binding TimelineScale, Mode=OneWayToSource}"
+          Offset="{Binding TimelineOffset, Mode=OneWayToSource}"
+          SelectedItemId="{Binding SelectedItemId}"
+          SelectedHitBoundScreen="{Binding SelectedHitBoundScreen, Mode=OneWayToSource}"
+        >
+          <controls:DiagramTimeline.ContextMenu>
+            <ContextMenu>
+              <MenuItem Header="和音図を配置"
+                        Command="{Binding PlaceChordDiagramCommand}"/>
+              <MenuItem Header="新しい和音" Command="{Binding PlaceEmptyChordDiagramCommand}"></MenuItem>
+            </ContextMenu>
+          </controls:DiagramTimeline.ContextMenu>
+        </controls:DiagramTimeline>
+        <Canvas IsHitTestVisible="True">
+          <Border IsVisible="{Binding IsFlyoutOpen}"
+                  Canvas.Left="{Binding FlyoutX}"
+                  Canvas.Top="{Binding FlyoutY}"
+                  Background="Transparent"
+                  IsHitTestVisible="True">
+            <ContentControl Content="{Binding FlyoutContent}">
+              <ContentControl.DataTemplates>
+                <DataTemplate DataType="flyout:PitchlineFlyoutViewModel">
+                  <flyoutview:PitchlineFlyoutView/>
+                </DataTemplate>
+              </ContentControl.DataTemplates>
+            </ContentControl>
+          </Border>
+        </Canvas>
+      </Grid>
 
-      <Popup IsOpen="{Binding IsFlyoutOpen}"
-       Placement="AnchorAndGravity"
-       PlacementAnchor="TopRight"
-       PlacementGravity="Left"
-       HorizontalOffset="{Binding FlyoutX}"
-       VerticalOffset="{Binding FlyoutY}"
-       PlacementTarget="{Binding #TimelineControl}">
-        <ContentControl Content="{Binding FlyoutContent}">
-          <ContentControl.DataTemplates>
-            <DataTemplate DataType="flyout:PitchlineFlyoutViewModel">
-              <flyoutview:PitchlineFlyoutView/>
-            </DataTemplate>
-          </ContentControl.DataTemplates>
-        </ContentControl>
-      </Popup>
-    </Grid>
+      <!-- <Popup IsOpen="{Binding IsFlyoutOpen}" -->
+      <!--  Placement="AnchorAndGravity" -->
+      <!--  PlacementAnchor="TopRight" -->
+      <!--  PlacementGravity="Left" -->
+      <!--  HorizontalOffset="{Binding FlyoutX}" -->
+      <!--  VerticalOffset="{Binding FlyoutY}" -->
+      <!--  PlacementTarget="{Binding #TimelineControl}"> -->
+      <!--   <ContentControl Content="{Binding FlyoutContent}"> -->
+      <!--     <ContentControl.DataTemplates> -->
+      <!--       <DataTemplate DataType="flyout:PitchlineFlyoutViewModel"> -->
+      <!--         <flyoutview:PitchlineFlyoutView/> -->
+      <!--       </DataTemplate> -->
+      <!--     </ContentControl.DataTemplates> -->
+      <!--   </ContentControl> -->
+      <!-- </Popup> -->
+    
   </DockPanel>
 
 </Window>

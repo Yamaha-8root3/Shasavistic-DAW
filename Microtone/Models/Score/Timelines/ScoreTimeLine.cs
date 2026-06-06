@@ -29,6 +29,15 @@ namespace Microtone.Models.Score.Timelines
       //_items.Add(item);
       //_items.Sort((a, b) => a.StartTick.CompareTo(b.StartTick));
     }
+    
+    public bool UpdateTick(Guid id, long newTick)
+    {
+      if (!_items.TryGetValue(id, out var item)) return false;
+      _idByTick.Remove(item.StartTick);
+      item.StartTick = newTick;
+      _idByTick[newTick] = id;
+      return true;
+    }
 
     public bool Remove(Guid id)
     {
