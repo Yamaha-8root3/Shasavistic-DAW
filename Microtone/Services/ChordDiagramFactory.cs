@@ -76,15 +76,15 @@ namespace Microtone.Services
         pitchlineBounds.Inflate(5, 5);
         commands.Add(new SKHitAreaCommand
         {
-          ZIndex = 21,
+          ZIndex = 22,
           Rect = pitchlineBounds,
           HitInfo = new HitInfo
           {
             Kind = HitKind.Pitchline,
-            TargetId = cd.Id,
+            TargetId = pl.Source.Id,
             ZIndex = 21,
             Bounds = pitchlineBounds,
-            Attributes = { ["PitchlineId"] = pl.Source.Id }
+            Attributes = { ["ChordDiagramId"] = cd.Id }
           }
         });
         //Pitchline選択ハイライト
@@ -92,7 +92,7 @@ namespace Microtone.Services
         {
           commands.Add(new SKRectCommand
           {
-            ZIndex = 20,
+            ZIndex = 21,
             Rect = pitchlineBounds,
             Fill = paint.SelectionOverlay(),
             Stroke = paint.SelectionBorder(),

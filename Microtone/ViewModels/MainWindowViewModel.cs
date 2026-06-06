@@ -5,22 +5,24 @@ using Microtone.Interfaces.Editor;
 using Microtone.Models;
 using Microtone.Models.Rendering;
 using Microtone.Models.Rendering.HitTest;
-using Microtone.Models.Rendering.SKRenderCommands;
 using Microtone.Models.Score;
 using Microtone.Models.Score.Pitch;
-using Microtone.Models.Score.Timelines.ScoreItems;
 using Microtone.Models.Score.Timelines.ScoreItems.PitchLine;
 using Microtone.Services;
 using Microtone.Services.Editor;
 using Microtone.Services.Editor.Selection;
 using Microtone.ViewModels.Controls;
 using ReactiveUI;
+using SkiaSharp;
 using System;
+using System.Collections.Generic;
 using System.Linq;
-using System.Reactive.Joins;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using Avalonia.Controls;
+using Microtone.Controls;
+using Microtone.ViewModels.Flyout;
 using static Microtone.Controls.DiagramTimeline;
 
 namespace Microtone.ViewModels
@@ -36,17 +38,55 @@ namespace Microtone.ViewModels
       get => _renderData;
       private set => SetProperty(ref _renderData, value);
     }
-    //private Guid? _selectedChordDiagramId;
-    //public Guid? SelectedChordDiagramId
-    //{
-    //  get => _selectedChordDiagramId;
-    //  private set => SetProperty(ref _selectedChordDiagramId, value);
-    //}
     private long _cursorTick = 0;
     public long CursorTick
     {
       get => _cursorTick;
       private set => UpdateCursorTick(value);
+    }
+
+    public bool IsFlyoutOpen
+    {
+      get;
+      private set => SetProperty(ref field, value);
+    } = false;
+
+    public double FlyoutX
+    {
+      get;
+      private set => SetProperty(ref field, value);
+    }
+
+    public double FlyoutY
+    {
+      get;
+      private set => SetProperty(ref field, value);
+    }
+
+    public ViewModelBase? FlyoutContent
+    {
+      get;
+      private set => SetProperty(ref field, value);
+    }
+
+    public SKPoint TimelineScale { get; set; }
+    public Point TimelineOffset { get; set; }
+
+    private Rect? _selectedHitBoundScreen;
+    public Rect? SelectedHitBoundScreen
+    {
+      get => _selectedHitBoundScreen;
+      set
+      {
+        SetProperty(ref _selectedHitBoundScreen, value);
+        UpdateFlyoutPosition();
+      }
+    }
+
+    public Guid? SelectedItemId
+    {
+      get;
+      private set => SetProperty(ref field, value);
     }
 
     public TimeIndicatorViewModel TimeIndicatorVM { get; } = new();
@@ -55,8 +95,9 @@ namespace Microtone.ViewModels
     public ICommand OnPressedCommand { get; }
     public ICommand OnDragCommand { get; }
     public ICommand OnDragReleasedCommand { get; }
-    public ICommand OnRightClickedCommand { get; }
+    public ICommand OnClickedCommand { get; }
     public ICommand PlaceChordDiagramCommand { get; }
+    public ICommand PlaceEmptyChordDiagramCommand { get; }
 
     private ScoreSession _session = new();
     private ScoreData score => _session.Score;
@@ -66,24 +107,23 @@ namespace Microtone.ViewModels
 
     private DragSession? _dragSession = null;
 
-    ISelectionState _selection;
+    ISelectionState? _selection;
     private object? _pendingSelection = null;
-
-    private Point _rightClickWorldPos;
-
+    
     public MainWindowViewModel(IDialogService dialogService)
     {
       _editor = new ScoreEditor(_session);
 
 
       _dialogService = dialogService;
-
+      OnPressedCommand = new RelayCommand<ClickedInfo?>(OnPressed);
       OnScaleChangedCommand = new RelayCommand<double>(OnScaleChanged);
-      OnPressedCommand = new RelayCommand<PressedInfo?>(OnPressed);
       OnDragCommand = new RelayCommand<DragInfo>(OnDrag);
       OnDragReleasedCommand = new RelayCommand(OnDragReleased);
-      OnRightClickedCommand = new RelayCommand<Point>(OnRightClicked);
+      OnClickedCommand = new RelayCommand<ClickedInfo?>(OnClicked);
       PlaceChordDiagramCommand = new RelayCommand(PlaceChordDiagram);
+      PlaceEmptyChordDiagramCommand = new RelayCommand(PlaceEmptyChordDiagram);
+      _editor.TimelineObjectRemoved += OnObjectRemoved;
 
       PlayCommand = new RelayCommand(Play, () => !IsPlaying);
       StopCommand = new RelayCommand(Stop, () => IsPlaying);
@@ -106,9 +146,10 @@ namespace Microtone.ViewModels
       var a = cd.AddPitchLine(new Harmonograph([0]).ToOvertoneFormula(score.Dimension1DOffset));
       var b = cd.AddPitchLine(new Harmonograph([1, -1, 0, 1]).ToOvertoneFormula(score.Dimension1DOffset));
       cd.AddDimensionlineChain(a.Id, b.Id, score.Dimension1DOffset);
-      score.ScoreTimeLines[0].Add(cd);
-
+      // score.ScoreTimeLines[0].Add(cd);
+      _editor.RegistorScoreTimelineObject(cd);
       var data = DiagramTimelineRenderDataBuilder.Build(_session);
+
 
       RenderData = data;
     }
@@ -125,44 +166,51 @@ namespace Microtone.ViewModels
       _session.PixelPerQuarter *= (float)(delta > 0 ? 1.1 : 0.9);
       RebuildRenderData();
     }
-    private void OnPressed(PressedInfo? info)
+    private void OnPressed(ClickedInfo? info)
     {
       if (info == null) return;
       if (info.Hit == null || info.Hit.Kind == HitKind.None)
       {
         // 空白クリック → 選択解除
-        _selection?.Clear();
+        _selection = null;
+        IsFlyoutOpen = false;
         CursorTick = _grid.SnapEnabled ?
           GridSnapper.SnapTick((long)(info.WorldPos.X / _session.PixelPerQuarter * score.TimeSignatureMap.PPQ), score.TimeSignatureMap, _grid.Division, 100) :
           (long)(info.WorldPos.X / _session.PixelPerQuarter * score.TimeSignatureMap.PPQ);
         RebuildRenderData();
         return;
       }
-      //TODO Addictive = falseになっているが就職キー対応
-      //info.Modifiers利用
+      var additive = info.Modifiers == Avalonia.Input.KeyModifiers.Control;
       switch (info.Hit.Kind)
       {
-        case HitKind.ChordDiagramBody:
-          bool additive = info.Modifiers == Avalonia.Input.KeyModifiers.Control;
+          case HitKind.ChordDiagramBody:
           if (_selection is not ChordDiagramSelection cdSel)
             _selection = cdSel = new ChordDiagramSelection();
 
           _pendingSelection = cdSel.Ids.Contains(info.Hit.TargetId) && !additive
-              ? info.Hit.TargetId        // pending
-              : null;                    // 即選択
+              ? info.Hit.TargetId
+              : null;
 
           if (_pendingSelection == null)
             _selection.Select(info.Hit.TargetId, additive);
 
+          IsFlyoutOpen = false;
+          SelectedItemId = info.Hit.TargetId;
           CursorTick = _editor.FindItem(info.Hit.TargetId)?.StartTick ?? CursorTick;
+
           break;
+
         case HitKind.Pitchline:
-          if (_selection is not PitchlineSelection)
-            _selection = new PitchlineSelection();
-          if (info.Hit.Attributes.TryGetValue("PitchlineId", out var plIdObj) && plIdObj is int plId)
+          if (info.Hit.Attributes.TryGetValue("ChordDiagramId", out var cdid) && cdid is Guid)
           {
-            _selection.Select((info.Hit.TargetId, plId), false);
+             if (_selection is not PitchlineSelection selection || selection.ParentChordDiagramId != (Guid)cdid)
+                _selection = new PitchlineSelection((Guid)cdid);
+             _selection.Select(info.Hit.TargetId, additive);
+             SelectedItemId = info.Hit.TargetId;
           }
+          FlyoutContent = BuildPitchlineFlyout();
+          IsFlyoutOpen = true;
+          UpdateFlyoutPosition();
           break;
       }
       RebuildRenderData();
@@ -170,19 +218,16 @@ namespace Microtone.ViewModels
 
     private void OnDrag(DragInfo? info)
     {
-
+      if (info is null || _selection is null) return;
       switch (_selection)
       {
         case ChordDiagramSelection cds:
-          if (cds == null || cds.IsEmpty || info == null) break;
+          if (cds.IsEmpty) break;
           _dragSession ??= new DragSession(
             cds.Ids.Select(id => _editor.FindItem(id)!).Where(x => x != null));
           break;
       }
-
-      //if (SelectedChordDiagramId == null || info == null) return;
-      //_dragSession ??= new DragSession([_editor.FindItem(SelectedChordDiagramId.Value)!]);
-      if (_dragSession == null || info == null) return;
+      if (_dragSession == null) return;
       long rawOffset = _editor.PixelToTick(info.DragDelta.X); // ← Editorへ委譲
       long snappedOffset = _editor.SnapDragOffset(_dragSession.OriginalTicks.Values.Min(), rawOffset);
       _dragSession.SetOffset(snappedOffset);
@@ -193,13 +238,11 @@ namespace Microtone.ViewModels
     {
       if (_dragSession != null)
       {
-        // ドラッグした → 選択維持
         _editor.CommitDrag(_dragSession);
         _dragSession = null;
       }
       else if (_pendingSelection != null)
       {
-        // ドラッグしなかった → 単一選択に絞る
         switch (_selection)
         {
           case ChordDiagramSelection cdSel when _pendingSelection is Guid id && cdSel.Ids.Contains(id):
@@ -211,14 +254,19 @@ namespace Microtone.ViewModels
       RebuildRenderData();
     }
 
-
-
-    private void OnRightClicked(Point worldPos)
+    private void OnClicked(ClickedInfo? info)
     {
-      _rightClickWorldPos = worldPos;
-      switch (_selection)
+      if (info == null) return;
+      switch (info.Button)
       {
-        case ChordDiagramSelection cds:
+        case Avalonia.Input.MouseButton.Left when info.Hit == null || info.Hit.Kind == HitKind.None:
+          // IsFlyoutOpen = false;
+          break;
+        case Avalonia.Input.MouseButton.Left:
+          // IsFlyoutOpen = _selection is PitchlineSelection;
+          // UpdateFlyoutPosition(); 
+          break;
+        case Avalonia.Input.MouseButton.Right:
           break;
       }
     }
@@ -227,7 +275,17 @@ namespace Microtone.ViewModels
     {
       var result = await _dialogService.ShowChordInputDialog(_session.Score.Dimension1DOffset);
       if (result is null) return;
-      _editor.PlaceChordDiagram(CursorTick, result);
+      var cd = _editor.PlaceChordDiagram(CursorTick, result);
+      _selection = new ChordDiagramSelection(cd.Id);
+      RebuildRenderData();
+    }
+
+    private void PlaceEmptyChordDiagram()
+    {
+      var cd = new ChordDiagram { StartTick = CursorTick, LengthTick = 240 };
+      cd.AddPitchLine(new Harmonograph([0]).ToOvertoneFormula(score.Dimension1DOffset)).IsBase = true;
+      _editor.RegistorScoreTimelineObject(cd);
+      _selection = new ChordDiagramSelection(cd.Id);
       RebuildRenderData();
     }
 
@@ -242,6 +300,33 @@ namespace Microtone.ViewModels
       RenderData.SetCursorCommand(cmd); // 常に現在のRenderDataインスタンスに対して実行
     }
 
+    private void UpdateFlyoutPosition()
+    {
+      if (_selectedHitBoundScreen == null || !IsFlyoutOpen) return;
+      FlyoutX = _selectedHitBoundScreen.Value.Right;
+      FlyoutY = (_selectedHitBoundScreen.Value.Top + _selectedHitBoundScreen.Value.Bottom) / 2;
+    }
+    
+    private PitchlineFlyoutViewModel? BuildPitchlineFlyout()
+    {
+      if (_selection is not PitchlineSelection pls || pls.IsEmpty) return null;
+      if (_editor.FindItem(pls.ParentChordDiagramId) is not ChordDiagram cd) return null;
+      return new PitchlineFlyoutViewModel(pls, cd, score.Dimension1DOffset, RebuildRenderData);
+    }
+
+    private void OnObjectRemoved(Guid id)
+    {
+      switch (_selection) 
+      {
+        case ChordDiagramSelection cds when cds.Ids.Contains(id):
+          _selection = null;
+          break;
+        case PitchlineSelection pls when pls.ParentChordDiagramId == id:
+          IsFlyoutOpen = false;
+          _selection = null;
+          break;
+      }
+    }
 
     private CancellationTokenSource? _playCts;
     public bool IsPlaying => _playCts != null;

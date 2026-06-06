@@ -15,7 +15,7 @@ namespace Microtone.Models.Rendering.SKRenderCommands
         public required float AngleDegrees { get; init; }
         public required SKPaint Stroke { get; init; }
         public required Guid SourceId { get; init; }
-        public required int PitchlineId { get; init; }
+        public required Guid PitchlineId { get; init; }
         public override HitInfo? Render(SKCanvas canvas)
         {
             var path = new SKPath();

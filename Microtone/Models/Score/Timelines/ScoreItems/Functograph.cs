@@ -181,10 +181,10 @@ namespace Microtone.Models.Score.Timelines.ScoreItems
             Harmonograph host;
             Harmonograph guest;
 
-            int rootpl;
-            int? guestpl = null;
+            Guid rootpl;
+            Guid? guestpl = null;
 
-            int lastpl;
+            Guid lastpl;
 
             Ratio bottom = new(int.MaxValue, 1);
 
@@ -224,7 +224,7 @@ namespace Microtone.Models.Score.Timelines.ScoreItems
             guest = root.Clone();
             guest += definingChord.Guest;
             guest -= definingChord.Host;
-            lastpl = (int)guestpl!;
+            lastpl = (Guid)guestpl!;
             foreach (var item in GuestDown)
             {
                 var pl = diagram.AddPitchLine(guest.ToOvertoneFormula(dimensionsDefinision), item == NoteState.Omit)!;

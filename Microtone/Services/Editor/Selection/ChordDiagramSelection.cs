@@ -10,11 +10,23 @@ namespace Microtone.Services.Editor.Selection
     public HashSet<Guid> Ids { get; } = [];
     public bool IsEmpty => Ids.Count == 0;
 
-    public void Select(object id, bool additive)
+    public ChordDiagramSelection() { }
+    public ChordDiagramSelection(Guid id)
+    {
+      Ids.Add(id);
+    }
+
+    public void Select(Guid id, bool additive)
     {
       if (!additive) Clear();
-      Ids.Add((Guid)id);
+      Ids.Add(id);
     }
+
+    public void Deselect(Guid id)
+    {
+      Ids.Remove(id);
+    }
+
     public void Clear() => Ids.Clear();
     public bool Contains(object id) => Ids.Contains((Guid)id);
   }

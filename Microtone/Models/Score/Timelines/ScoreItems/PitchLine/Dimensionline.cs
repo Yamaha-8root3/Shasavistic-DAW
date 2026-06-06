@@ -7,8 +7,8 @@ namespace Microtone.Models.Score.Timelines.ScoreItems.PitchLine
 {
     public class Dimensionline
     {
-        public int Id { get; internal set; } = 0;
-        public (int, int) PitchIds { get; internal set; }
+        public Guid Id { get; internal set; }
+        public (Guid, Guid) PitchIds { get; internal set; }
         public DimensionlinePosition _FromPosition = DimensionlinePosition.Left;
         public DimensionlinePosition _ToPosition = DimensionlinePosition.Left;
         public double? offsetX = 0.0;

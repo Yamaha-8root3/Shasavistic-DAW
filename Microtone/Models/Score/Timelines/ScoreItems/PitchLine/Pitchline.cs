@@ -7,10 +7,17 @@ namespace Microtone.Models.Score.Timelines.ScoreItems.PitchLine
 {
     public class Pitchline
     {
-        public int Id { get; internal set; } = 0;
+        public Guid Id { get; internal set; }
         public OvertoneFormula Formula { get; internal set; } = new([0]);
         public bool IsIntermediate { get; set; } = false;
+        /// <summary>
+        /// 根音かどうか
+        /// </summary>
         public bool IsBase { get; set; } = false;
+        /// <summary>
+        /// ChordDiaramのツリーの根本として扱うか
+        /// </summary>
+        public bool IsRoot { get; set; } = false;
         public bool IsDotted = false;
         public double? offsetX = null;
         public double? offsetLength = null;

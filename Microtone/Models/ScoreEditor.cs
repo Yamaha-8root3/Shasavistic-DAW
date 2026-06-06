@@ -12,7 +12,8 @@ namespace Microtone.Models
   internal class ScoreEditor(ScoreSession session)
   {
     private readonly ScoreSession _session = session;
-
+    public event Action<Guid>? TimelineObjectRemoved;
+    
     public long PixelToTick(double pixelX)
     {
       var v = _session.Score;
@@ -32,6 +33,23 @@ namespace Microtone.Models
       return snapped - originalMinTick;
     }
 
+    public ITimelineItem RegistorScoreTimelineObject(ITimelineItem item, int timelineIndex = 0)
+    {
+      _session.Score.ScoreTimeLines[timelineIndex].Add(item);
+      switch (item)
+      {
+        case ChordDiagram cd:
+          cd.BecameEmpty += c => RemoveScoreTimelineObject(c.Id, timelineIndex);
+          return cd;
+      }
+      return item;
+    }
+    public void RemoveScoreTimelineObject(Guid id, int timelineIndex = 0)
+    {
+        _session.Score.ScoreTimeLines[timelineIndex].Remove(id);
+        TimelineObjectRemoved?.Invoke(id);
+    }
+    
     // ChordDiagram配置（PlaceChordDiagramから）
     public ChordDiagram PlaceChordDiagram(long tick, List<Harmonograph> harmonographs)
     {
@@ -46,11 +64,11 @@ namespace Microtone.Models
         if (formula.Ratio.Value == baseFormula.Ratio.Value) continue;
         var plid = cd.AddPitchLine(formula)?.Id;
         if (plid is null) continue;
-        cd.AddDimensionlineChain(basePl.Id, (int)plid, _session.Score.Dimension1DOffset);
+        cd.AddDimensionlineChain(basePl.Id, (Guid)plid, _session.Score.Dimension1DOffset);
       }
 
-      _session.Score.ScoreTimeLines[0].Add(cd);
-      return cd;
+      // _session.Score.ScoreTimeLines[0].Add(cd);
+      return RegistorScoreTimelineObject(cd,0) as ChordDiagram ?? throw new InvalidOperationException();
     }
 
     // ドラッグ確定（OnDragReleasedから）

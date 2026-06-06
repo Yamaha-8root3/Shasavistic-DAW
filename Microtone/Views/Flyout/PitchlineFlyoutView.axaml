@@ -1,0 +1,67 @@
+﻿<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:flyout="using:Microtone.ViewModels.Flyout"
+             mc:Ignorable="d" 
+             x:Class="Microtone.Views.Flyout.PitchlineFlyoutView"
+             x:DataType="flyout:PitchlineFlyoutViewModel"
+             >
+        <Border Background="#3A3943" Padding="8" CornerRadius="4"
+                BorderBrush="White" BorderThickness="1" 
+        >
+            <StackPanel Spacing="6" Width="200">
+                    <CheckBox IsThreeState="True"
+                              IsChecked="{Binding IsOmitted}"
+                              Command="{Binding ToggleOmitCommand}"
+                              Content="省略"/>
+                    <UniformGrid Rows="3" Columns="4" ColumnSpacing="0" RowSpacing="0" Height="150" >
+                        <Button Command="{Binding AddNoteCommand}"
+                                CommandParameter="{x:Static flyout:DimParams.U2}">
+                                <Image Source="avares://Microtone/Assets/chord-diagram-components/ascent-symbol.png" Margin="10"></Image>
+                        </Button>
+                        <Button Command="{Binding AddNoteCommand}"
+                                CommandParameter="{x:Static flyout:DimParams.U3}">
+                                <Image Source="avares://Microtone/Assets/chord-diagram-components/ascent-symbol.png" Margin="10"></Image>
+                        </Button>
+                        <Button Command="{Binding AddNoteCommand}"
+                                CommandParameter="{x:Static flyout:DimParams.U4}">
+                                <Image Source="avares://Microtone/Assets/chord-diagram-components/ascent-symbol.png" Margin="10"></Image>
+                        </Button>
+                        <Button Command="{Binding AddNoteCommand}"
+                                CommandParameter="{x:Static flyout:DimParams.U5}">
+                                <Image Source="avares://Microtone/Assets/chord-diagram-components/ascent-symbol.png" Margin="10"></Image>
+                        </Button>
+                        <Image Source="avares://Microtone/Assets/chord-diagram-components/2d-symbol.png" Margin="10"></Image>
+                        <Image Source="avares://Microtone/Assets/chord-diagram-components/3d-symbol.png" Margin="10"></Image>
+                        <Image Source="avares://Microtone/Assets/chord-diagram-components/4d-symbol.png" Margin="10"></Image>
+                        <Image Source="avares://Microtone/Assets/chord-diagram-components/5d-symbol.png" Margin="10"></Image>
+                        <Button Command="{Binding AddNoteCommand}"
+                                CommandParameter="{x:Static flyout:DimParams.D2}">
+                                <Image Source="avares://Microtone/Assets/chord-diagram-components/descent-symbol.png" Margin="10"></Image>
+                        </Button>
+                        <Button Command="{Binding AddNoteCommand}"
+                                CommandParameter="{x:Static flyout:DimParams.D3}">
+                                <Image Source="avares://Microtone/Assets/chord-diagram-components/descent-symbol.png" Margin="10"></Image>
+                        </Button>
+                        <Button Command="{Binding AddNoteCommand}"
+                                CommandParameter="{x:Static flyout:DimParams.D4}">
+                                <Image Source="avares://Microtone/Assets/chord-diagram-components/descent-symbol.png" Margin="10"></Image>
+                        </Button>
+                        <Button Command="{Binding AddNoteCommand}"
+                                CommandParameter="{x:Static flyout:DimParams.D5}">
+                                <Image Source="avares://Microtone/Assets/chord-diagram-components/descent-symbol.png" Margin="10"></Image>
+                        </Button>
+                    </UniformGrid>
+                    <ToggleButton Width="50" IsVisible="{Binding IsSinglePitchline}"
+                                  IsChecked="{Binding IsBase, Mode=OneWay}"
+                                  Command="{Binding SetBaseCommand}">
+                            <Image Source="avares://Microtone/Assets/chord-diagram-components/base-symbol.png" Margin="10"></Image>
+                    </ToggleButton>
+                    
+                    <Button Content="削除" Command="{Binding RemoveNoteCommand}"></Button>
+                    <!-- <TextBlock Text="{Binding Isroot}"></TextBlock> -->
+                </StackPanel>    
+        </Border>
+        
+</UserControl>

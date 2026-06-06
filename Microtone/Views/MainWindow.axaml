@@ -5,6 +5,8 @@
         xmlns:vm="using:Microtone.ViewModels"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:flyout="using:Microtone.ViewModels.Flyout"
+        xmlns:flyoutview="using:Microtone.Views.Flyout"
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         x:Class="Microtone.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
@@ -21,10 +23,15 @@
                 Height="20"
                 Background="Black"
                 Orientation="Horizontal">
+      <Label>Scale:</Label>
       <Label Content="{Binding #TimelineControl.Scale}"/>
+      <Label>Offset:</Label>
       <Label Content="{Binding #TimelineControl.Offset}"/>
+      <Label>Pointer:</Label>
       <Label Content="{Binding #TimelineControl.PointerPosition}"/>
       <Label Content="{Binding #TimelineControl.PointerHit.TargetId}"/>
+      <Label>Hitbound:</Label>
+      <Label Content="{Binding SelectedHitBoundScreen}"></Label>
       <Popup PlacementTarget="{Binding #TimelineControl}"
              Placement="Pointer"
              IsOpen="True">
@@ -38,9 +45,9 @@
       <Vcontrols:TimeIndicatorControl
       DataContext="{Binding TimeIndicatorVM}"/>
 
-      <Button Command="{Binding PlayCommand}" IsEnabled="True">Play</Button>
-      
-      <Button Command="{Binding StopCommand}" IsEnabled="True">Stop</Button>
+      <Button Command="{Binding PlayCommand}">Play</Button>
+
+      <Button Command="{Binding StopCommand}">Stop</Button>
 
     </StackPanel>
     <Grid Margin="0">
@@ -52,14 +59,36 @@
       OnPressedCommand="{Binding OnPressedCommand}"
       OnDragCommand="{Binding OnDragCommand}"
       OnDragReleasedCommand="{Binding OnDragReleasedCommand}"
-      OnRightClickedCommand="{Binding  OnRightClickedCommand}">
+      OnClickedCommand="{Binding OnClickedCommand}"
+      Scale="{Binding TimelineScale, Mode=OneWayToSource}"
+      Offset="{Binding TimelineOffset, Mode=OneWayToSource}"
+      SelectedItemId="{Binding SelectedItemId}"
+      SelectedHitBoundScreen="{Binding SelectedHitBoundScreen, Mode=OneWayToSource}"
+      >
         <controls:DiagramTimeline.ContextMenu>
           <ContextMenu>
             <MenuItem Header="和音図を配置"
                       Command="{Binding PlaceChordDiagramCommand}"/>
+            <MenuItem Header="新しい和音" Command="{Binding PlaceEmptyChordDiagramCommand}"></MenuItem>
           </ContextMenu>
         </controls:DiagramTimeline.ContextMenu>
       </controls:DiagramTimeline>
+
+      <Popup IsOpen="{Binding IsFlyoutOpen}"
+       Placement="AnchorAndGravity"
+       PlacementAnchor="TopRight"
+       PlacementGravity="Left"
+       HorizontalOffset="{Binding FlyoutX}"
+       VerticalOffset="{Binding FlyoutY}"
+       PlacementTarget="{Binding #TimelineControl}">
+        <ContentControl Content="{Binding FlyoutContent}">
+          <ContentControl.DataTemplates>
+            <DataTemplate DataType="flyout:PitchlineFlyoutViewModel">
+              <flyoutview:PitchlineFlyoutView/>
+            </DataTemplate>
+          </ContentControl.DataTemplates>
+        </ContentControl>
+      </Popup>
     </Grid>
   </DockPanel>
 

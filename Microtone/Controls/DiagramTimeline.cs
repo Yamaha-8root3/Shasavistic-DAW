@@ -12,6 +12,7 @@ using Microtone.Models.Rendering;
 using Microtone.Models.Rendering.HitTest;
 using SkiaSharp;
 using System;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Security.Cryptography;
@@ -31,7 +32,18 @@ namespace Microtone.Controls
     private bool _initialized;
     private bool _isDraggingObject;
 
-    public record PressedInfo(HitInfo? Hit, Point WorldPos, KeyModifiers Modifiers);
+    private HitInfo? _lastPressedHit;
+
+    public record ClickedInfo(HitInfo? Hit, Point WorldPos, MouseButton Button, KeyModifiers Modifiers);
+    public record DragInfo
+    {
+      public required ClickedInfo PressedInfo;
+      public Point DragStart;
+      public Point DragEnd;
+      public Point DragDelta => DragEnd - DragStart;
+      //イベント間の一瞬の移動量 全体の移動量ではない
+      public Point Delta;
+    }
 
     //bindできるものを定義
     public static readonly StyledProperty<SKRenderData?> RenderDataProperty =
@@ -74,29 +86,22 @@ namespace Microtone.Controls
       set => SetValue(PointerHitProperty, value);
     }
 
-    //public static readonly StyledProperty<long> CursorTickProperty =
-    //AvaloniaProperty.Register<DiagramTimeline, long>(nameof(CursorTick), 0L);
-    //public long CursorTick
-    //{
-    //  get => GetValue(CursorTickProperty);
-    //  set => SetValue(CursorTickProperty, value);
-    //}
+    public static readonly StyledProperty<Guid?> SelectedItemIdProperty =
+    AvaloniaProperty.Register<DiagramTimeline, Guid?>(nameof(SelectedItemId));
+    public Guid? SelectedItemId
+    {
+      get => GetValue(SelectedItemIdProperty);
+      set => SetValue(SelectedItemIdProperty, value);
+    }
 
-    //public static readonly StyledProperty<float> PixelPerQuarterProperty =
-    //    AvaloniaProperty.Register<DiagramTimeline, float>(nameof(PixelPerQuarter), 100f);
-    //public float PixelPerQuarter
-    //{
-    //  get => GetValue(PixelPerQuarterProperty);
-    //  set => SetValue(PixelPerQuarterProperty, value);
-    //}
-
-    //public static readonly StyledProperty<int> PPQProperty =
-    //    AvaloniaProperty.Register<DiagramTimeline, int>(nameof(PPQ), 480);
-    //public int PPQ
-    //{
-    //  get => GetValue(PPQProperty);
-    //  set => SetValue(PPQProperty, value);
-    //}
+    public static readonly StyledProperty<Rect?> SelectedHitBoundScreenProperty =
+        AvaloniaProperty.Register<DiagramTimeline, Rect?>(nameof(SelectedHitBoundScreen),
+            defaultBindingMode: Avalonia.Data.BindingMode.OneWayToSource);
+    public Rect? SelectedHitBoundScreen
+    {
+      get => GetValue(SelectedHitBoundScreenProperty);
+      private set => SetValue(SelectedHitBoundScreenProperty, value);
+    }
 
     //コマンドの定義
     public static readonly StyledProperty<ICommand> OnScaleChangedCommandProperty =
@@ -131,12 +136,20 @@ namespace Microtone.Controls
       set => SetValue(OnDragReleasedCommandProperty, value);
     }
 
-    public static readonly StyledProperty<ICommand> OnRightClickedCommandProperty =
-        AvaloniaProperty.Register<DiagramTimeline, ICommand>(nameof(OnRightClickedCommand));
-    public ICommand OnRightClickedCommand
+    //public static readonly StyledProperty<ICommand> OnRightClickedCommandProperty =
+    //    AvaloniaProperty.Register<DiagramTimeline, ICommand>(nameof(OnRightClickedCommand));
+    //public ICommand OnRightClickedCommand
+    //{
+    //  get => GetValue(OnRightClickedCommandProperty);
+    //  set => SetValue(OnRightClickedCommandProperty, value);
+    //}
+
+    public static readonly StyledProperty<ICommand> OnClickedCommandProperty =
+        AvaloniaProperty.Register<DiagramTimeline, ICommand>(nameof(OnClickedCommand));
+    public ICommand OnClickedCommand
     {
-      get => GetValue(OnRightClickedCommandProperty);
-      set => SetValue(OnRightClickedCommandProperty, value);
+      get => GetValue(OnClickedCommandProperty);
+      set => SetValue(OnClickedCommandProperty, value);
     }
 
 
@@ -153,7 +166,7 @@ namespace Microtone.Controls
       //System.Diagnostics.Debug.WriteLine("Render called");
       context.FillRectangle(Brushes.Transparent, Bounds);
       base.Render(context);
-      context.Custom(new CustomDrawOp(Bounds, Offset, Scale, RenderData, hitTestManager ));
+      context.Custom(new CustomDrawOp(Bounds, Offset, Scale, RenderData, hitTestManager));
     }
 
     private class CustomDrawOp : ICustomDrawOperation
@@ -257,7 +270,8 @@ namespace Microtone.Controls
       }
       var worldPos = new SKPoint((float)PointerPosition.X, (float)PointerPosition.Y);
       var hit = hitTestManager.HitTest(worldPos);
-      OnPressedCommand?.Execute(new PressedInfo(hit,PointerPosition,e.KeyModifiers));
+      _lastPressedHit = hit;
+      OnPressedCommand?.Execute(new ClickedInfo(hit, PointerPosition, GetMouseButton(e), e.KeyModifiers));
 
       if (e.GetCurrentPoint(this).Properties.IsRightButtonPressed) return;
 
@@ -281,9 +295,18 @@ namespace Microtone.Controls
           // ワールド座標デルタに変換して ViewModel へ
           DragInfo info = new()
           {
-            DragStart = (Point)_dragStartWorld!,
+            PressedInfo = new ClickedInfo(
+                _lastPressedHit,
+                _dragStartWorld.Value,
+                MouseButton.Left,
+                e.KeyModifiers
+            ),
+            DragStart = _dragStartWorld.Value,
             DragEnd = PointerPosition,
-            Delta = delta
+            Delta = new Point(
+                (PointerPosition.X - _dragStartWorld.Value.X),
+                (PointerPosition.Y - _dragStartWorld.Value.Y)
+            )
           };
 
           OnDragCommand?.Execute(info);
@@ -296,29 +319,30 @@ namespace Microtone.Controls
         }
         _lastDrag = p;
       }
-      //if (_lastDrag != null)
-      //{
-      //    Offset += p - _lastDrag.Value;
-      //    _lastDrag = p;
-      //    InvalidateVisual();
-      //}
     }
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
-      if (_isDraggingObject)
+      bool didDrag =
+        _dragStartWorld.HasValue && (PointerPosition - _dragStartWorld.Value).ToSKPoint().Length > 5;
+      if (!didDrag)
+      {
+        OnClickedCommand?.Execute(new ClickedInfo(
+            _lastPressedHit,
+            PointerPosition,
+            e.InitialPressMouseButton,
+            e.KeyModifiers
+        ));
+      }
+      else if (_isDraggingObject)
         OnDragReleasedCommand?.Execute(null);
+
+      if (e.InitialPressMouseButton == MouseButton.Right)
+        ContextMenu?.Open();
+
       _lastDrag = null;
       _isDraggingObject = false;
       _dragStartWorld = null;
       e.Pointer.Capture(null);
-
-      //var props = e.GetCurrentPoint(this).Properties;
-      if (e.InitialPressMouseButton == MouseButton.Right)
-      {
-        OnRightClickedCommand?.Execute(PointerPosition);
-        ContextMenu?.Open(this);
-        return;
-      }
     }
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
     {
@@ -363,6 +387,63 @@ namespace Microtone.Controls
     {
       PointerPosition = new Point((_mouse.X - Offset.X) / Scale.X, (_mouse.Y - Offset.Y) / Scale.Y);
     }
+    private void RefreshSelectedHitBoundScreen()
+    {
+      if (SelectedItemId == null) { SelectedHitBoundScreen = null; return; }
+      var hit = hitTestManager.GetHitInfo(SelectedItemId.Value);
+      if (hit == null) return;
+
+      var topLevel = TopLevel.GetTopLevel(this);
+      if (topLevel == null) return;
+      var scaling = topLevel.RenderScaling;
+
+      // ワールド→コントロール相対座標
+      var ctrlTL = new Point(
+          hit.Bounds.Left * Scale.X + Offset.X,
+          hit.Bounds.Top * Scale.Y + Offset.Y);
+      var ctrlBR = new Point(
+          hit.Bounds.Right * Scale.X + Offset.X,
+          hit.Bounds.Bottom * Scale.Y + Offset.Y);
+
+      // コントロール相対→スクリーン→ウィンドウ相対
+      var controlOrigin = this.PointToScreen(new Point(0, 0));
+      var screenTL = this.PointToScreen(ctrlTL);
+      var screenBR = this.PointToScreen(ctrlBR);
+
+      SelectedHitBoundScreen = new Rect(
+          ctrlTL,ctrlBR);
+
+
+
+      if (topLevel != null)
+      {
+        //var screenPoint2 = _mouse;
+        //var windowOrigin2 = new Point(0, 0);
+        //var scaling2 = topLevel.RenderScaling;
+        //var windowX = (screenPoint2.X - windowOrigin2.X) / scaling2;
+        //var windowY = (screenPoint2.Y - windowOrigin2.Y) / scaling2;
+        //System.Diagnostics.Debug.WriteLine(
+            //$"Mouse(control):{_mouse} → Window:{windowX:F1},{windowY:F1} Scaling:{scaling}");
+        //SelectedHitBoundScreen = new Rect(controlOrigin.X, controlOrigin.Y, 0,0);
+      }
+      if (hit != null)
+      {
+        System.Diagnostics.Debug.WriteLine(
+            $"Mouse(control):{_mouse.X:F1},{_mouse.Y:F1} \n" +
+            $"Id:{SelectedItemId}" +
+            $"Hit Bounds(World):{hit.Bounds.Left:F1},{hit.Bounds.Top:F1},{hit.Bounds.Right:F1},{hit.Bounds.Bottom:F1} \n" +
+            $"ctrlTL:{ctrlTL.X:F1},{ctrlTL.Y:F1} ctrlBR:{ctrlBR.X:F1},{ctrlBR.Y:F1} "
+);
+      }
+    }
+    private MouseButton GetMouseButton(PointerPressedEventArgs EventArgs)
+    {
+      var properties = EventArgs.GetCurrentPoint(this).Properties;
+      if (properties.IsLeftButtonPressed) return MouseButton.Left;
+      if (properties.IsRightButtonPressed) return MouseButton.Right;
+      if (properties.IsMiddleButtonPressed) return MouseButton.Middle;
+      return MouseButton.None; // デフォルト
+    }
 
     //バインド内容の監視
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
@@ -372,6 +453,7 @@ namespace Microtone.Controls
       if (change.Property == RenderDataProperty)
       {
         RenderDataChanged();
+        RefreshSelectedHitBoundScreen();
       }
       else if (change.Property == BoundsProperty && change.OldValue != null && change.NewValue != null)
       {
@@ -393,17 +475,21 @@ namespace Microtone.Controls
       {
         InvalidateVisual();
         RefreshPointerPosition();
+        RefreshSelectedHitBoundScreen();
+      }
+      else if (change.Property == SelectedItemIdProperty)
+      {
+        RefreshSelectedHitBoundScreen();
       }
     }
 
-    private void RenderDataChanged() {
-      if (_prevRenderData != null)
-        _prevRenderData.CursorChanged -= InvalidateVisual;
+    private void RenderDataChanged()
+    {
+      _prevRenderData?.CursorChanged -= InvalidateVisual;
 
       _prevRenderData = RenderData;
 
-      if (RenderData != null)
-        RenderData.CursorChanged += InvalidateVisual;
+      RenderData?.CursorChanged += InvalidateVisual;
       InvalidateVisual();
     }
 

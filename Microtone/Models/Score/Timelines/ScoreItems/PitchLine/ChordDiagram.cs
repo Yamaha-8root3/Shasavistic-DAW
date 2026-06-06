@@ -20,44 +20,44 @@ namespace Microtone.Models.Score.Timelines.ScoreItems.PitchLine
     {
       TimeSeconds = timeSeconds;
     }
+    public event Action<ChordDiagram>? BecameEmpty;
 
-    private static (int, int) NormalizeKey(int a, int b) => a < b ? (a, b) : (b, a);
+    private static (Guid, Guid) NormalizeKey(Guid a, Guid b) => a.CompareTo(b) < 0 ? (a, b) : (b, a);
 
     //root
     public IResolvablePitch RootFormula { get; set; } = new ModalCenteredPitch(new([0]));
-    //ID振るためのもの
-    private int _nextPitchlineId = 0;
-    private int _nextDimensionlineId = 0;
 
-    private readonly Dictionary<int, Pitchline> _pitchlines = [];
-    private readonly Dictionary<Ratio, int> _pitchlinesByRatio = [];
-    private readonly Dictionary<int, Dimensionline> _dimensionlines = [];
-    private readonly Dictionary<(int, int), int> _dimensionlinesByPitchIds = [];
+    private readonly Dictionary<Guid, Pitchline> _pitchlines = [];
+    private readonly Dictionary<Ratio, Guid> _pitchlinesByRatio = [];
+    private readonly Dictionary<Guid, Dimensionline> _dimensionlines = [];
+    private readonly Dictionary<(Guid, Guid), Guid> _dimensionlinesByPitchIds = [];
 
-    public IReadOnlyDictionary<int, Pitchline> Pitchlines => _pitchlines;
-    public IReadOnlyDictionary<int, Dimensionline> Dimensionlines => _dimensionlines;
+    public IReadOnlyDictionary<Guid, Pitchline> Pitchlines => _pitchlines;
+    public IReadOnlyDictionary<Guid, Dimensionline> Dimensionlines => _dimensionlines;
 
-    public Dictionary<int, PitchlineOverride> PitchlineOverrides { get; } = [];
-    public Dictionary<int, DimensionlineOverride> DimensionlineOverrides { get; } = [];
-    public Pitchline? AddPitchLine(OvertoneFormula formula, bool isIntermediate = false)
+    public Dictionary<Guid, PitchlineOverride> PitchlineOverrides { get; } = [];
+    public Dictionary<Guid, DimensionlineOverride> DimensionlineOverrides { get; } = [];
+    public Pitchline AddPitchLine(OvertoneFormula formula, bool isIntermediate = false, bool isRoot = false)
     {
       var r = formula.Ratio.ToRatio;
       if (_pitchlinesByRatio.TryGetValue(r, out var existingId))
-        if (isIntermediate) return null;
-        else if (!_pitchlines[existingId].IsIntermediate)
+        if (isIntermediate) return _pitchlines[existingId];
+        else if (_pitchlines[existingId].IsIntermediate)
         {
-          _pitchlines[existingId].IsIntermediate = true;
+          _pitchlines[existingId].IsIntermediate = false;
           return _pitchlines[existingId];
         }
-        else return null;
+        else return _pitchlines[existingId];
 
-      int id = _nextPitchlineId++;
+      if (!_pitchlines.Values.Any(p => p.IsRoot)) isRoot = true;
+      var id = Guid.NewGuid();
       var pitch = new Pitchline
       {
         Id = id,
         Formula = formula.Clone(),
         IsIntermediate = isIntermediate,
-        IsDotted = isIntermediate
+        IsDotted = isIntermediate,
+        IsRoot = isRoot,
       };
 
       _pitchlines[id] = pitch;
@@ -65,7 +65,7 @@ namespace Microtone.Models.Score.Timelines.ScoreItems.PitchLine
 
       return _pitchlines[id];
     }
-    public void RemovePitchLine(int id)
+    public void RemovePitchLine(Guid id, bool checkOrphan = true)
     {
       if (!_pitchlines.TryGetValue(id, out var pitchLine))
         return;
@@ -77,13 +77,15 @@ namespace Microtone.Models.Score.Timelines.ScoreItems.PitchLine
           .ToList();
 
       foreach (var connId in relatedConnections)
-        RemoveDimensionline(connId);
+        RemoveDimensionline(connId,false);
+      if (checkOrphan) RemoveOrphanedPitchlines();
 
       _pitchlinesByRatio.Remove(pitchLine.Formula.Ratio.ToRatio);
       _pitchlines.Remove(id);
       PitchlineOverrides.Remove(id);
+      if (_pitchlines.Count == 0) BecameEmpty?.Invoke(this);
     }
-    public void UpdatePitch(int id, OvertoneFormula newformula)
+    public void UpdatePitch(Guid id, OvertoneFormula newformula)
     {
       var newratio = newformula.Ratio.ToRatio;
       if (_pitchlinesByRatio.ContainsKey(newratio))
@@ -98,21 +100,35 @@ namespace Microtone.Models.Score.Timelines.ScoreItems.PitchLine
 
       pitchLine.Formula = newformula;
     }
-    public int? FindPitchLineByPitch(Ratio pitch)
+
+    public List<Pitchline> GetRelatedPitchLines(Guid pitchlineId)
+    {
+      return _dimensionlines.Values
+          .Where(c => c.PitchIds.Item1 == pitchlineId || c.PitchIds.Item2 == pitchlineId)
+          .Select(c => c.PitchIds.Item1 != pitchlineId ? _pitchlines[c.PitchIds.Item1] : _pitchlines[c.PitchIds.Item2])
+          .ToList();
+    }
+    public List<Dimensionline> GetRelatedDimensionLines(Guid PitchlineId)
+    {
+      return _dimensionlines.Values
+          .Where(c => c.PitchIds.Item1 == PitchlineId || c.PitchIds.Item2 == PitchlineId)
+          .ToList();
+    }
+    public Guid? FindPitchLineByPitch(Ratio pitch)
     {
       return _pitchlinesByRatio.TryGetValue(pitch, out var id) ? id : null;
     }
-    public bool HasDimensionlineAt(int id, DimensionlinePosition position)
+    public bool HasDimensionlineAt(Guid id, DimensionlinePosition position)
     {
       return _dimensionlines.Values.Any(dl =>
           (dl.PitchIds.Item1 == id && dl._FromPosition == position) ||
           (dl.PitchIds.Item2 == id && dl._ToPosition == position)
       );
     }
-    public List<Dimensionline> AddDimensionlineChain(int a, int b, Dimensions<int> dimension1DOffset)
+    public List<Dimensionline> AddDimensionlineChain(Guid a, Guid b, Dimensions<int> dimension1DOffset)
     {
       var key = NormalizeKey(a, b);
-      if (_dimensionlinesByPitchIds.TryGetValue(key, out int value))
+      if (_dimensionlinesByPitchIds.TryGetValue(key, out var value))
         return [];
 
       if (_pitchlines[a].Formula.RatioValue > _pitchlines[b].Formula.RatioValue)
@@ -123,7 +139,7 @@ namespace Microtone.Models.Score.Timelines.ScoreItems.PitchLine
       var interval = new Harmonograph(higher.Formula - lower.Formula, dimension1DOffset);
       if (interval.IsSingleStep)
       {
-        int id = _nextDimensionlineId++;
+        Guid id = Guid.NewGuid();
         var dl = new Dimensionline { Id = id, PitchIds = key };
         _dimensionlines[id] = dl;
         _dimensionlinesByPitchIds[key] = id;
@@ -147,13 +163,13 @@ namespace Microtone.Models.Score.Timelines.ScoreItems.PitchLine
             currentpitch[i] += step;
             currentpitch[1] += dimension1DOffset[i]! * step;
 
-            if (_pitchlinesByRatio.TryGetValue(currentpitch.Ratio.ToRatio, out int pl))
+            if (_pitchlinesByRatio.TryGetValue(currentpitch.Ratio.ToRatio, out var pl))
               if (_dimensionlinesByPitchIds.ContainsKey((currentpitchlineid, pl)))
               { currentpitchlineid = pl; continue; }
             var newpitchline = AddPitchLine(currentpitch, isIntermediate: true);
             if (newpitchline is null) continue;
             newpitchline.IsDotted = true;
-            int id = _nextDimensionlineId++;
+            Guid id = Guid.NewGuid();
             var dl = new Dimensionline
             {
               Id = id,
@@ -176,13 +192,13 @@ namespace Microtone.Models.Score.Timelines.ScoreItems.PitchLine
             {
               currentpitch[1] += step;
 
-              if (_pitchlinesByRatio.TryGetValue(currentpitch.Ratio.ToRatio, out int pl))
+              if (_pitchlinesByRatio.TryGetValue(currentpitch.Ratio.ToRatio, out var pl))
                 if (_dimensionlinesByPitchIds.ContainsKey((currentpitchlineid, pl)))
                 { currentpitchlineid = pl; continue; }
               var newpitchline = AddPitchLine(currentpitch, isIntermediate: true)!;
               if (newpitchline is null) continue;
               newpitchline.IsDotted = true;
-              int id = _nextDimensionlineId++;
+              Guid id = Guid.NewGuid();
               var dl = new Dimensionline
               {
                 Id = id,
@@ -198,7 +214,7 @@ namespace Microtone.Models.Score.Timelines.ScoreItems.PitchLine
 
         // 終点と結合
         if (_dimensionlinesByPitchIds.ContainsKey((currentpitchlineid, higher.Id))) return response;
-        int id_ = _nextDimensionlineId++;
+        Guid id_ = Guid.NewGuid();
         var dl_ = new Dimensionline
         {
           Id = id_,
@@ -210,9 +226,7 @@ namespace Microtone.Models.Score.Timelines.ScoreItems.PitchLine
         return response;
       }
     }
-
-
-    public void RemoveDimensionline(int id)
+    public void RemoveDimensionline(Guid id, bool checkOrphan = true)
     {
       if (!_dimensionlines.TryGetValue(id, out var dl))
         return;
@@ -220,16 +234,59 @@ namespace Microtone.Models.Score.Timelines.ScoreItems.PitchLine
       _dimensionlinesByPitchIds.Remove(dl.PitchIds);
       _dimensionlines.Remove(id);
       DimensionlineOverrides.Remove(id);
+      if (checkOrphan) RemoveOrphanedPitchlines();
     }
-    public int? FindDimensionline(int a, int b) =>
-        _dimensionlinesByPitchIds.TryGetValue(NormalizeKey(a, b), out var id) ? id : null;
+    private void RemoveOrphanedPitchlines()
+    {
+      var roots = _pitchlines.Values
+        .Where(pl => pl.IsRoot)
+        .Select(pl => pl.Id)
+        .ToHashSet();
 
+      if (roots.Count == 0) return;
+
+      // BFSで到達可能ノードを列挙
+      var reachable = new HashSet<Guid>(roots);
+      var queue = new Queue<Guid>(roots);
+      while (queue.Count > 0)
+      {
+        var cur = queue.Dequeue();
+        foreach (var dl in _dimensionlines.Values)
+        {
+          var (a, b) = dl.PitchIds;
+          if (a == cur && reachable.Add(b)) queue.Enqueue(b);
+          if (b == cur && reachable.Add(a)) queue.Enqueue(a);
+        }
+      }
+
+      // 到達できないPitchlineを削除（次元線も連鎖削除される）
+      var orphans = _pitchlines.Keys.Where(k => !reachable.Contains(k)).ToList();
+      foreach (var plId in orphans)
+        RemovePitchLine(plId,false);
+      if (_pitchlines.Count == 0)
+        BecameEmpty?.Invoke(this);
+    }
+
+    public Pitchline? GetBase()
+    {
+      return _pitchlines.Values.FirstOrDefault(p => p.IsBase);
+    }
+
+    public void SetBase(Guid id)
+    {
+      _pitchlines.Values.Where(p => p.Id != id).ToList().ForEach(p => p.IsBase = false);
+      _pitchlines[id].IsBase = true;
+    }
+    
+    
+    public Guid? FindDimensionline(Guid a, Guid b) =>
+        _dimensionlinesByPitchIds.TryGetValue(NormalizeKey(a, b), out var id) ? id : null;
     public class DimensionlinePath
     {
       public required Pitchline Higher { get; set; }
       public required Pitchline Lower { get; set; }
     }
-    public DimensionlinePath GetDimensionlinePath(int dimensionlineId)
+    public DimensionlinePath GetDimensionlinePath(Guid dimensionlineId)
     {
       if (!_dimensionlines.TryGetValue(dimensionlineId, out var dl))
         throw new InvalidOperationException("次元線が見つかりません");
@@ -240,11 +297,10 @@ namespace Microtone.Models.Score.Timelines.ScoreItems.PitchLine
       else
         return new DimensionlinePath { Higher = b, Lower = a };
     }
-
     /// <summary>
     /// 指定した Pitchline が Lower 側として接続している次元番号セット
     /// </summary>
-    public IEnumerable<int> GetDimensionsAsLower(int pitchlineId, Dimensions<int> offset1d)
+    public IEnumerable<int> GetDimensionsAsLower(Guid pitchlineId, Dimensions<int> offset1d)
     {
       foreach (var dl in _dimensionlines.Values)
       {
@@ -255,11 +311,10 @@ namespace Microtone.Models.Score.Timelines.ScoreItems.PitchLine
           if (harmonograph[i] != 0) { yield return i; break; }
       }
     }
-
     /// <summary>
     /// 指定した Pitchline が Higher 側として接続している次元番号セット
     /// </summary>
-    public IEnumerable<int> GetDimensionsAsHigher(int pitchlineId, Dimensions<int> offset1d)
+    public IEnumerable<int> GetDimensionsAsHigher(Guid pitchlineId, Dimensions<int> offset1d)
     {
       foreach (var dl in _dimensionlines.Values)
       {
@@ -275,7 +330,7 @@ namespace Microtone.Models.Score.Timelines.ScoreItems.PitchLine
             ScoreVariables v,
             ScoreRenderTheme theme)
     {
-      var pitchlineLayouts = new Dictionary<int, PitchlineLayout>();
+      var pitchlineLayouts = new Dictionary<Guid, PitchlineLayout>();
 
       // 1. 各 Pitchline の PitchlineLayout を生成
       foreach (var (id, pl) in Pitchlines)

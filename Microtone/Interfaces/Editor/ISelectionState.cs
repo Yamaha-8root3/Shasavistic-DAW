@@ -6,7 +6,8 @@ namespace Microtone.Interfaces.Editor
 {
   internal interface ISelectionState
   {
-    void Select(object id, bool additive);
+    void Select(Guid  id, bool additive);
+    void Deselect(Guid  id);
     void Clear();
     bool IsEmpty { get; }
   }
